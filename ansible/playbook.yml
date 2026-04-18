@@ -1,0 +1,58 @@
+---
+- name: Deploy CodeExec
+  hosts: localhost
+  connection: local
+
+  vars:
+    postgres_user: postgres
+    postgres_password: postgres
+    postgres_db: codeexec
+
+  tasks:
+
+    - name: Stop old containers
+      command: docker rm -f codeexec-postgres codeexec-backend codeexec-frontend
+      ignore_errors: true
+
+    - name: Create network
+      command: docker network create codeexec-network
+      ignore_errors: true
+
+    - name: Run PostgreSQL
+      command: >
+        docker run -d
+        --name codeexec-postgres
+        --network codeexec-network
+        -e POSTGRES_USER={{ postgres_user }}
+        -e POSTGRES_PASSWORD={{ postgres_password }}
+        -e POSTGRES_DB={{ postgres_db }}
+        -p 5433:5432
+        postgres:15
+
+    - name: Wait for PostgreSQL
+      command: docker exec codeexec-postgres pg_isready -U {{ postgres_user }}
+      register: pg_ready
+      retries: 10
+      delay: 3
+      until: pg_ready.rc == 0
+
+    - name: Run backend
+      command: >
+        docker run -d
+        --name codeexec-backend
+        --network codeexec-network
+        -e DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@codeexec-postgres:5432/{{ postgres_db }}
+        -e JWT_SECRET=secret
+        -p 4000:4000
+        codeexec-backend
+
+    - name: Run Prisma migration
+      command: docker exec codeexec-backend npx prisma migrate deploy
+
+    - name: Run frontend
+      command: >
+        docker run -d
+        --name codeexec-frontend
+        --network codeexec-network
+        -p 5173:5173
+        codeexec-frontend
