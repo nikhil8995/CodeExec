@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        SONAR_HOST = 'http://host.docker.internal:9000'
+        SONAR_TOKEN = credentials('sonar-token')
+    }
+
     stages {
 
         stage('Install Backend') {
@@ -16,6 +21,18 @@ pipeline {
                 dir('frontend') {
                     sh 'npm install'
                 }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                sh '''
+                sonar-scanner \
+                -Dsonar.projectKey=codeexec \
+                -Dsonar.sources=backend,frontend \
+                -Dsonar.host.url=${SONAR_HOST} \
+                -Dsonar.login=${SONAR_TOKEN}
+                '''
             }
         }
 
