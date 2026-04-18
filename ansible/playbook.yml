@@ -9,14 +9,18 @@
     postgres_db: codeexec
 
   tasks:
-
     - name: Stop old containers
       command: docker rm -f codeexec-postgres codeexec-backend codeexec-frontend
       ignore_errors: true
 
-    - name: Create network
-      command: docker network create codeexec-network
+    - name: Check if network exists
+      command: docker network inspect codeexec-network
+      register: network_check
       ignore_errors: true
+
+    - name: Create network if not exists
+      command: docker network create codeexec-network
+      when: network_check.rc != 0
 
     - name: Run PostgreSQL
       command: >
@@ -27,6 +31,7 @@
         -e POSTGRES_PASSWORD={{ postgres_password }}
         -e POSTGRES_DB={{ postgres_db }}
         -p 5433:5432
+        --restart unless-stopped
         postgres:15
 
     - name: Wait for PostgreSQL
@@ -42,8 +47,9 @@
         --name codeexec-backend
         --network codeexec-network
         -e DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@codeexec-postgres:5432/{{ postgres_db }}
-        -e JWT_SECRET=secret
+        -e JWT_SECRET=supersecretkey
         -p 4000:4000
+        --restart unless-stopped
         codeexec-backend
 
     - name: Run Prisma migration
@@ -55,4 +61,5 @@
         --name codeexec-frontend
         --network codeexec-network
         -p 5173:5173
+        --restart unless-stopped
         codeexec-frontend
