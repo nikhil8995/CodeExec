@@ -31,7 +31,7 @@ pipeline {
                 -Dsonar.projectKey=codeexec \
                 -Dsonar.sources=backend,frontend \
                 -Dsonar.host.url=http://sonarqube:9000 \
-                -Dsonar.login=${SONAR_TOKEN}
+                -Dsonar.token=${SONAR_TOKEN}
                 '''
             }
         }
