@@ -9,7 +9,6 @@ export default function QuestionSubmissions() {
   const [subs, setSubs] = useState([])
   const [question, setQuestion] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
@@ -18,104 +17,75 @@ export default function QuestionSubmissions() {
     ]).then(([s, q]) => {
       setSubs(s.data)
       setQuestion(q.data)
-    }).finally(() => setLoading(false))
+    })
   }, [id])
 
   return (
-    <div className="flex h-full gap-0 -m-6 overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex h-full" style={{ height: 'calc(100vh - 56px)' }}>
+
       {/* LEFT PANEL */}
-      <div className="w-72 flex-shrink-0 flex flex-col bg-dark-800 border-r border-dark-500 overflow-hidden">
-        <div className="px-4 py-4 border-b border-dark-500 flex-shrink-0">
-          <button
-            onClick={() => navigate('/my-questions')}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors mb-3 flex items-center gap-1"
-          >
+      <div className="w-72 border-r border-dark-500 bg-dark-800 flex flex-col">
+        <div className="p-4 border-b border-dark-500">
+          <button onClick={() => navigate('/my-questions')} className="text-xs text-slate-400 mb-2">
             ← Back
           </button>
-          <h2 className="font-display font-bold text-white text-sm leading-snug line-clamp-2">
-            {question?.title || 'Loading...'}
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">{subs.length} submission{subs.length !== 1 ? 's' : ''}</p>
+          <h2 className="text-white font-bold">{question?.title}</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="text-center py-10 text-slate-500 text-sm">Loading...</div>
-          ) : subs.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 text-sm">No submissions yet.</div>
-          ) : (
-            subs.map(sub => {
-              const active = selected?.id === sub.id
-              return (
-                <button
-                  key={sub.id}
-                  onClick={() => setSelected(sub)}
-                  className={`w-full text-left px-4 py-3 border-b border-dark-600 transition-all ${
-                    active ? 'bg-dark-600 border-l-2 border-l-brand-500' : 'hover:bg-dark-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-sm font-medium text-slate-200 truncate">{sub.user?.name}</span>
-                    <Badge label={sub.status} />
-                  </div>
-                  <p className="text-xs text-slate-500 font-mono">
-                    {new Date(sub.createdAt).toLocaleString()}
-                  </p>
-                </button>
-              )
-            })
-          )}
+          {subs.map(sub => {
+            const isSelected = selected?.id === sub.id
+
+            return (
+              <button
+                key={sub.id}
+                onClick={() => setSelected(sub)}
+                className={`w-full text-left p-3 border-b border-dark-600 transition-all
+                  ${isSelected ? 'bg-dark-600 border-l-4 border-brand-500' : 'hover:bg-dark-700'}`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-200">{sub.user?.name}</span>
+                  <Badge label={sub.status} />
+                </div>
+                <p className="text-xs text-slate-500">
+                  {new Date(sub.createdAt).toLocaleString()}
+                </p>
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="flex-1 overflow-y-auto bg-dark-900">
+      <div className="flex-1 p-6 overflow-y-auto bg-dark-900">
         {!selected ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="text-4xl mb-4 opacity-20">◈</div>
-            <p className="text-slate-500 text-sm">Select a submission from the left</p>
-          </div>
+          <p className="text-slate-500">Select a submission</p>
         ) : (
-          <div className="p-6 max-w-3xl mx-auto space-y-5 animate-fadeIn">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-display font-bold text-white">{selected.user?.name}</h3>
-                <p className="text-sm text-slate-500 font-mono">{selected.user?.email}</p>
-                <p className="text-xs text-slate-600 font-mono mt-1">
-                  {new Date(selected.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <Badge label={selected.status} />
-            </div>
+          <>
+            <h2 className="text-white text-lg font-bold">{selected.user?.name}</h2>
+            <p className="text-slate-400 text-sm">{selected.user?.email}</p>
 
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-2">Output</p>
-              <pre className={`text-sm font-mono rounded-xl p-4 border overflow-auto max-h-36 ${
-                selected.status === 'PASS'
-                  ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
-                  : 'bg-red-950/30 border-red-800/40 text-red-300'
-              }`}>
-                {selected.output || '(empty)'}
+            <p className="text-xs text-slate-500 mt-1">
+              Submission #{selected.id}
+            </p>
+
+            <div className="mt-4">
+              <h3 className="text-xs text-slate-500 mb-1">Output</h3>
+              <pre className="bg-black p-3 rounded text-green-400">
+                {selected.output}
               </pre>
             </div>
 
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-2">Submitted Code</p>
-              <div className="rounded-xl border border-dark-500 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2 bg-dark-700 border-b border-dark-500">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs text-slate-500 font-mono ml-2">solution.js</span>
-                </div>
-                <pre className="text-xs font-mono p-4 bg-dark-900 text-slate-300 overflow-auto whitespace-pre" style={{ maxHeight: '60vh' }}>
-                  {selected.code}
-                </pre>
-              </div>
+            <div className="mt-4">
+              <h3 className="text-xs text-slate-500 mb-1">Code</h3>
+              <pre className="bg-black p-3 rounded text-white overflow-auto max-h-[60vh]">
+                {selected.code}
+              </pre>
             </div>
-          </div>
+          </>
         )}
       </div>
+
     </div>
   )
 }
