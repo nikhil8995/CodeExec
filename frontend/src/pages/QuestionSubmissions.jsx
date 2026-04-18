@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../hooks/useApi'
-import Badge from '../components/ui/Badge'
 
 export default function QuestionSubmissions() {
   const { id } = useParams()
@@ -17,8 +16,18 @@ export default function QuestionSubmissions() {
     ]).then(([s, q]) => {
       setSubs(s.data)
       setQuestion(q.data)
+
+      // auto select first submission
+      if (s.data.length > 0) {
+        setSelected(s.data[0])
+      }
     })
   }, [id])
+
+  const handleSelect = (sub) => {
+    setSelected(sub)
+    window.scrollTo(0, 0)
+  }
 
   return (
     <div className="flex h-full" style={{ height: 'calc(100vh - 56px)' }}>
@@ -30,23 +39,37 @@ export default function QuestionSubmissions() {
             ← Back
           </button>
           <h2 className="text-white font-bold">{question?.title}</h2>
+
+          <p className="text-xs text-slate-500 mt-1">
+            {subs.length} submissions
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {subs.length === 0 && (
+            <p className="p-4 text-slate-500">No submissions yet</p>
+          )}
+
           {subs.map(sub => {
             const isSelected = selected?.id === sub.id
+            const isPass = sub.status === 'PASS'
 
             return (
               <button
                 key={sub.id}
-                onClick={() => setSelected(sub)}
+                onClick={() => handleSelect(sub)}
                 className={`w-full text-left p-3 border-b border-dark-600 transition-all
                   ${isSelected ? 'bg-dark-600 border-l-4 border-brand-500' : 'hover:bg-dark-700'}`}
               >
                 <div className="flex justify-between items-center">
                   <span className="text-slate-200">{sub.user?.name}</span>
-                  <Badge label={sub.status} />
+
+                  <span className={`text-xs px-2 py-1 rounded 
+                    ${isPass ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                    {sub.status}
+                  </span>
                 </div>
+
                 <p className="text-xs text-slate-500">
                   {new Date(sub.createdAt).toLocaleString()}
                 </p>
@@ -71,7 +94,7 @@ export default function QuestionSubmissions() {
 
             <div className="mt-4">
               <h3 className="text-xs text-slate-500 mb-1">Output</h3>
-              <pre className="bg-black p-3 rounded text-green-400">
+              <pre className="bg-black p-3 rounded text-green-400 border border-green-700">
                 {selected.output}
               </pre>
             </div>
