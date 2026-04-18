@@ -30,7 +30,7 @@ pipeline {
                 sonar-scanner \
                 -Dsonar.projectKey=codeexec \
                 -Dsonar.sources=backend,frontend \
-                -Dsonar.host.url=${SONAR_HOST} \
+                -Dsonar.host.url=http://sonarqube:9000 \
                 -Dsonar.login=${SONAR_TOKEN}
                 '''
             }
