@@ -8,7 +8,6 @@ import Button from '../components/ui/Button'
 function useCountdown(seconds, onExpire) {
   const [timeLeft, setTimeLeft] = useState(seconds)
   const expired = useRef(false)
-
   useEffect(() => {
     if (!seconds) return
     setTimeLeft(seconds)
@@ -26,7 +25,6 @@ function useCountdown(seconds, onExpire) {
     return () => clearInterval(id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds])
-
   return timeLeft
 }
 
@@ -36,86 +34,26 @@ function fmt(s) {
   return `${m}:${sec}`
 }
 
-function ResultPanel({ result }) {
-  if (!result) return null
-  const pass = result.status === 'PASS'
-
-  return (
-    <Card className={`border ${pass ? 'border-emerald-700/50 bg-emerald-900/10' : 'border-red-700/50 bg-red-900/10'} animate-fadeIn`}>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className={`text-2xl ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{pass ? '✓' : '✗'}</span>
-        <div>
-          <Badge label={result.status} />
-          <p className={`text-sm font-medium mt-1 ${pass ? 'text-emerald-300' : 'text-red-300'}`}>
-            {pass ? 'All tests passed!' : 'Some tests failed.'}
-            {result.saved === false && <span className="text-slate-500 text-xs ml-2">(not saved)</span>}
-            {result.saved === true && <span className="text-emerald-600 text-xs ml-2">✓ saved</span>}
-          </p>
-        </div>
-      </div>
-
-      {/* Test case breakdown — always shown */}
-      {result.results && result.results.length > 0 && (
-        <div className="space-y-3">
-          {result.results.map((r, i) => (
-            <div key={i} className={`rounded-xl border overflow-hidden ${r.pass ? 'border-emerald-800/40' : 'border-red-800/40'}`}>
-              {/* Case header */}
-              <div className={`flex items-center justify-between px-3 py-2 text-xs font-mono ${r.pass ? 'bg-emerald-950/40 text-emerald-400' : 'bg-red-950/40 text-red-400'}`}>
-                <span>{r.pass ? '✓' : '✗'} Case {i + 1}</span>
-                <Badge label={r.pass ? 'PASS' : 'FAIL'} />
-              </div>
-
-              {/* Case details */}
-              <div className="bg-dark-900 px-3 py-3 space-y-2">
-                {r.input !== undefined && r.input !== '' && (
-                  <div className="flex gap-3 text-xs font-mono">
-                    <span className="text-slate-500 w-16 flex-shrink-0">Input</span>
-                    <span className="text-slate-300">{r.input}</span>
-                  </div>
-                )}
-                <div className="flex gap-3 text-xs font-mono">
-                  <span className="text-slate-500 w-16 flex-shrink-0">Expected</span>
-                  <span className="text-emerald-400">{r.expected}</span>
-                </div>
-                <div className="flex gap-3 text-xs font-mono">
-                  <span className="text-slate-500 w-16 flex-shrink-0">Got</span>
-                  <span className={r.pass ? 'text-emerald-400' : 'text-red-400'}>{r.actual || '(empty)'}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Single (non-multi) fallback */}
-      {(!result.results || result.results.length === 0) && (
-        <div className="space-y-2">
-          <div>
-            <p className="text-xs text-slate-500 mb-1">Your Output:</p>
-            <pre className="text-xs font-mono bg-dark-900 rounded-lg p-3 text-slate-300 overflow-auto">{result.output || '(empty)'}</pre>
-          </div>
-          {!pass && result.expectedOutput && (
-            <div>
-              <p className="text-xs text-slate-500 mb-1">Expected:</p>
-              <pre className="text-xs font-mono bg-dark-900 rounded-lg p-3 text-emerald-400 overflow-auto">{result.expectedOutput}</pre>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  )
+function parseTestCases(raw) {
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed
+  } catch {}
+  return [{ input: '', output: raw.trim() }]
 }
 
 export default function QuestionDetail() {
   const { id } = useParams()
   const [question, setQuestion] = useState(null)
   const [code, setCode] = useState('')
-  const [result, setResult] = useState(null)
-  const [running, setRunning] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState(null)
+
+  // per-case run state: { [index]: { loading, result } }
+  const [caseResults, setCaseResults] = useState({})
+  const [activeCase, setActiveCase] = useState(0)
 
   useEffect(() => {
     api.get(`/questions/${id}`).then(r => {
@@ -124,6 +62,8 @@ export default function QuestionDetail() {
     }).finally(() => setFetching(false))
   }, [id])
 
+  const testCases = question ? parseTestCases(question.expectedOutput) : []
+
   const handleAutoSubmit = useCallback(() => {
     if (submitted) return
     doSubmit()
@@ -131,31 +71,40 @@ export default function QuestionDetail() {
   }, [submitted, code])
 
   const timeLeft = useCountdown(question?.timeLimit || 0, handleAutoSubmit)
-  const timerColor = timeLeft <= 30 ? 'text-red-400 animate-pulse' : timeLeft <= 60 ? 'text-yellow-400' : 'text-slate-400'
+  const timerColor = timeLeft <= 30 ? 'text-red-400 animate-pulse' : timeLeft <= 60 ? 'text-yellow-400' : 'text-slate-300'
 
-  const handleRun = async () => {
-    setRunning(true)
-    setResult(null)
+  // Run a single test case
+  const handleRunCase = async (index) => {
+    setCaseResults(prev => ({ ...prev, [index]: { loading: true, result: null } }))
     try {
-      const { data } = await api.post('/submissions/run', { code, questionId: id })
-      setResult(data)
+      const tc = testCases[index]
+      // build a single-case expected JSON so backend evaluates only this case
+      const singleExpected = JSON.stringify([{ input: tc.input, output: tc.output }])
+      const { data } = await api.post('/submissions/run', {
+        code,
+        questionId: id,
+        overrideExpected: singleExpected
+      })
+      setCaseResults(prev => ({ ...prev, [index]: { loading: false, result: data } }))
     } catch (e) {
-      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false, results: [] })
-    } finally {
-      setRunning(false)
+      setCaseResults(prev => ({
+        ...prev,
+        [index]: { loading: false, result: { status: 'FAIL', results: [{ actual: e.response?.data?.error || 'Error', expected: testCases[index].output, input: testCases[index].input, pass: false }] } }
+      }))
     }
   }
 
+  // Final submit all
   const doSubmit = async () => {
     if (submitted) return
     setSubmitting(true)
-    setResult(null)
+    setSubmitResult(null)
     try {
       const { data } = await api.post('/submissions', { code, questionId: id })
-      setResult(data)
+      setSubmitResult(data)
       setSubmitted(true)
     } catch (e) {
-      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false, results: [] })
+      setSubmitResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false, results: [] })
     } finally {
       setSubmitting(false)
     }
@@ -164,26 +113,31 @@ export default function QuestionDetail() {
   if (fetching) return <div className="text-center py-16 text-slate-500">Loading...</div>
   if (!question) return <div className="text-center py-16 text-red-400">Question not found.</div>
 
+  const cr = caseResults[activeCase]
+
   return (
-    <div className="max-w-5xl mx-auto animate-fadeIn">
+    <div className="max-w-6xl mx-auto animate-fadeIn space-y-4">
+
       {/* Timer */}
       {question.timeLimit > 0 && (
-        <div className="flex items-center justify-end mb-4 gap-3">
+        <div className="flex items-center justify-end gap-3">
           <span className="text-xs text-slate-500 font-mono uppercase tracking-wider">Time Remaining</span>
           <div className={`font-mono text-xl font-bold tabular-nums ${timerColor}`}>{fmt(timeLeft)}</div>
           {submitted && <span className="text-xs text-emerald-500 font-mono">● submitted</span>}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left panel */}
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* ── LEFT: problem description ── */}
         <div className="space-y-4">
           <Card>
-            <div className="flex items-start gap-3 mb-3">
+            <div className="flex items-center gap-2 mb-3">
               <Badge label={question.difficulty} />
               {question.timeLimit > 0 && (
                 <span className="text-xs font-mono text-slate-500 bg-dark-700 border border-dark-400 px-2 py-0.5 rounded-md">
-                  ⏱ {Math.floor(question.timeLimit / 60)}m {question.timeLimit % 60 > 0 ? `${question.timeLimit % 60}s` : ''}
+                  ⏱ {Math.floor(question.timeLimit / 60)}m{question.timeLimit % 60 > 0 ? ` ${question.timeLimit % 60}s` : ''}
                 </span>
               )}
             </div>
@@ -195,10 +149,112 @@ export default function QuestionDetail() {
             </div>
           </Card>
 
-          <ResultPanel result={result} />
+          {/* ── Test cases panel ── */}
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-display font-semibold text-slate-200">Test Cases</p>
+              <span className="text-xs text-slate-500 font-mono">{testCases.length} case{testCases.length !== 1 ? 's' : ''}</span>
+            </div>
+
+            {/* Case tabs */}
+            <div className="flex gap-2 flex-wrap">
+              {testCases.map((_, i) => {
+                const r = caseResults[i]
+                const hasResult = r && !r.loading && r.result
+                const casePassed = hasResult && r.result.status === 'PASS'
+                return (
+                  <button key={i} onClick={() => setActiveCase(i)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-all flex items-center gap-1.5 ${
+                      activeCase === i
+                        ? 'bg-dark-600 border-brand-500 text-slate-200'
+                        : 'bg-dark-700 border-dark-500 text-slate-500 hover:border-dark-400'
+                    }`}>
+                    {hasResult && (
+                      <span className={casePassed ? 'text-emerald-400' : 'text-red-400'}>
+                        {casePassed ? '✓' : '✗'}
+                      </span>
+                    )}
+                    Case {i + 1}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Active case detail */}
+            {testCases[activeCase] && (
+              <div className="bg-dark-900 rounded-xl border border-dark-500 overflow-hidden">
+                {/* Input */}
+                {testCases[activeCase].input !== undefined && testCases[activeCase].input !== '' && (
+                  <div className="px-4 py-3 border-b border-dark-600">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1.5">Input</p>
+                    <pre className="text-sm font-mono text-slate-300">{testCases[activeCase].input}</pre>
+                  </div>
+                )}
+                {/* Expected output */}
+                <div className="px-4 py-3 border-b border-dark-600">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1.5">Expected Output</p>
+                  <pre className="text-sm font-mono text-emerald-400">{testCases[activeCase].output}</pre>
+                </div>
+
+                {/* Run result for this case */}
+                {cr && (
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1.5">Your Output</p>
+                    {cr.loading ? (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                        <span className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                        Running...
+                      </div>
+                    ) : cr.result?.results?.[0] ? (
+                      <pre className={`text-sm font-mono ${cr.result.results[0].pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {cr.result.results[0].actual || '(empty)'}
+                      </pre>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Run this case button */}
+            <Button
+              variant="secondary"
+              className="w-full justify-center"
+              onClick={() => handleRunCase(activeCase)}
+              loading={cr?.loading}
+              disabled={!code.trim() || submitted}>
+              ▷ Run Case {activeCase + 1}
+            </Button>
+          </Card>
+
+          {/* Submit result summary */}
+          {submitResult && (
+            <Card className={`border ${submitResult.status === 'PASS' ? 'border-emerald-700/50 bg-emerald-900/10' : 'border-red-700/50 bg-red-900/10'}`}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`text-2xl ${submitResult.status === 'PASS' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {submitResult.status === 'PASS' ? '✓' : '✗'}
+                </span>
+                <div>
+                  <Badge label={submitResult.status} />
+                  <p className={`text-sm font-medium mt-1 ${submitResult.status === 'PASS' ? 'text-emerald-300' : 'text-red-300'}`}>
+                    {submitResult.status === 'PASS' ? 'All tests passed! Submission saved.' : 'Some tests failed.'}
+                  </p>
+                </div>
+              </div>
+              {submitResult.results?.length > 0 && (
+                <div className="space-y-2">
+                  {submitResult.results.map((r, i) => (
+                    <div key={i} className={`flex items-center justify-between text-xs font-mono px-3 py-2 rounded-lg border ${r.pass ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'}`}>
+                      <span>{r.pass ? '✓' : '✗'} Case {i + 1}{r.input ? ` · in: ${r.input}` : ''}</span>
+                      <span>got: {r.actual || '(empty)'} · want: {r.expected}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
         </div>
 
-        {/* Right panel */}
+        {/* ── RIGHT: code editor ── */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -211,7 +267,7 @@ export default function QuestionDetail() {
           </div>
 
           <textarea
-            className="code-editor min-h-[380px]"
+            className="code-editor min-h-[460px]"
             value={code}
             onChange={e => setCode(e.target.value)}
             spellCheck={false}
@@ -219,26 +275,16 @@ export default function QuestionDetail() {
             disabled={submitted}
           />
 
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="flex-1 justify-center"
-              onClick={handleRun}
-              loading={running}
-              disabled={!code.trim() || submitting || submitted}>
-              ▷ Run Code
-            </Button>
-            <Button
-              className="flex-1 justify-center"
-              onClick={doSubmit}
-              loading={submitting}
-              disabled={!code.trim() || running || submitted}>
-              {submitted ? '✓ Submitted' : '↑ Submit'}
-            </Button>
-          </div>
+          <Button
+            className="w-full justify-center py-3"
+            onClick={doSubmit}
+            loading={submitting}
+            disabled={!code.trim() || submitted}>
+            {submitted ? '✓ Submitted' : '↑ Submit All Cases'}
+          </Button>
 
           {submitted && (
-            <p className="text-center text-xs text-slate-500">Submission locked. Refresh to start over.</p>
+            <p className="text-center text-xs text-slate-500">Submission saved. Refresh to try again.</p>
           )}
         </div>
       </div>
