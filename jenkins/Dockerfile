@@ -2,9 +2,10 @@ FROM jenkins/jenkins:lts
 
 USER root
 
-# Install required tools
+# Fix SSL + install required tools
 RUN apt-get update && \
     apt-get install -y \
+    ca-certificates \
     nodejs \
     npm \
     docker.io \
@@ -13,11 +14,11 @@ RUN apt-get update && \
     unzip \
     && apt-get clean
 
-# Install Sonar Scanner
-RUN wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip && \
-    unzip sonar-scanner-cli-*.zip && \
-    mv sonar-scanner-* /opt/sonar-scanner && \
+# Install Sonar Scanner (stable + explicit)
+RUN wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip -O /tmp/sonar.zip && \
+    unzip /tmp/sonar.zip -d /opt && \
+    mv /opt/sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner && \
     ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/bin/sonar-scanner && \
-    rm sonar-scanner-cli-*.zip
+    rm /tmp/sonar.zip
 
 USER jenkins

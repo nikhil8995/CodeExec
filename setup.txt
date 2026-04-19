@@ -1,0 +1,179 @@
+SETUP GUIDE – CodeExec DevOps Project
+
+---
+
+1. PREREQUISITES
+
+---
+
+Make sure installed:
+
+* Docker
+* Ansible
+* Git
+
+---
+
+2. CLONE PROJECT
+
+---
+
+git clone https://github.com/nikhil8995/CodeExec.git
+cd CodeExec
+
+---
+
+3. BUILD CUSTOM JENKINS IMAGE
+
+---
+
+docker build -t my-jenkins ./jenkins
+
+---
+
+4. SETUP DEVOPS INFRA (JENKINS + SONAR)
+
+---
+
+ansible-playbook ansible/setup-devops.yml
+
+Wait 1–2 minutes for SonarQube to fully start.
+
+---
+
+5. ACCESS SERVICES
+
+---
+
+Jenkins:
+http://localhost:8080
+
+SonarQube:
+http://localhost:9000
+
+---
+
+6. SONARQUBE INITIAL SETUP
+
+---
+
+Login:
+username: admin
+password: admin
+
+→ Change password
+
+→ Go to:
+Profile → Security → Generate Token
+
+Name: jenkins-token
+Type: Global Analysis Token
+
+Copy token.
+
+---
+
+7. CONFIGURE JENKINS
+
+---
+
+Open:
+http://localhost:8080
+
+Unlock Jenkins:
+docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+
+Install suggested plugins.
+
+---
+
+8. ADD SONAR TOKEN IN JENKINS
+
+---
+
+Manage Jenkins → Credentials → Global → Add Credentials
+
+Kind: Secret Text
+Secret: (paste token)
+ID: sonar-token
+
+---
+
+9. CREATE PIPELINE JOB
+
+---
+
+New Item → Pipeline → Name: CodeExec
+
+Pipeline Definition:
+Pipeline script from SCM
+
+Repository:
+https://github.com/nikhil8995/CodeExec.git
+
+Branch:
+main
+
+Script Path:
+Jenkinsfile
+
+Save.
+
+---
+
+10. RUN PIPELINE
+
+---
+
+Click:
+Build Now
+
+---
+
+11. DEPLOYMENT HAPPENS AUTOMATICALLY
+
+---
+
+Pipeline will:
+
+* Install dependencies
+* Run SonarQube analysis
+* Build Docker images
+* Deploy using Ansible
+
+---
+
+12. ACCESS APPLICATION
+
+---
+
+Frontend:
+http://localhost:5173
+
+Backend:
+http://localhost:4000
+
+---
+
+13. VERIFY EVERYTHING
+
+---
+
+* Jenkins build: SUCCESS
+* SonarQube: Project visible
+* App: Registration/Login working
+
+---
+
+14. NOTES
+
+---
+
+* Jenkins uses custom Docker image (my-jenkins)
+* SonarQube uses volumes (persistent)
+* Ansible handles full deployment
+* Docker network used for service communication
+
+---
+
+## END
