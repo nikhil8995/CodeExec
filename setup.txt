@@ -177,3 +177,18 @@ http://localhost:4000
 ---
 
 ## END
+
+Stop EVERYTHING
+echo "Stopping all running containers..."
+docker stop $(docker ps -q) 2>/dev/null
+
+echo "Removing all containers..."
+docker rm $(docker ps -aq) 2>/dev/null
+
+echo "Removing custom networks..."
+docker network rm codeexec-network devops-network 2>/dev/null
+
+echo "Pruning unused networks..."
+docker network prune -f
+
+echo "Stopping done."
