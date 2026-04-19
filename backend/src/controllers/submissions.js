@@ -1,8 +1,8 @@
 const prisma = require('../utils/prisma');
 const { exec } = require('child_process');
-const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const path = require('path');
 
 const runCode = (code, stdin = '') => new Promise((resolve) => {
   const tmpFile = path.join(os.tmpdir(), `ce_${Date.now()}_${Math.random().toString(36).slice(2)}.js`);
@@ -37,6 +37,7 @@ const runAllCases = async (code, expectedRaw) => {
   return { status: allPass ? 'PASS' : 'FAIL', output: displayOutput || '', results, isMulti };
 };
 
+// Run only — no DB save
 exports.runCodeOnly = async (req, res) => {
   try {
     const { code, questionId, overrideExpected } = req.body;
@@ -48,6 +49,26 @@ exports.runCodeOnly = async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+// Save pre-verified results — no re-run
+exports.saveSubmission = async (req, res) => {
+  try {
+    const { code, questionId, status, output, results } = req.body;
+    const question = await prisma.question.findUnique({ where: { id: parseInt(questionId) } });
+    if (!question) return res.status(404).json({ error: 'Question not found' });
+    const sub = await prisma.submission.create({
+      data: {
+        code,
+        output: output || '',
+        status: status === 'PASS' ? 'PASS' : 'FAIL',
+        userId: req.user.id,
+        questionId: parseInt(questionId)
+      }
+    });
+    res.json({ ...sub, results, saved: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// Original submit (run + save) — kept for fallback
 exports.submit = async (req, res) => {
   try {
     const { code, questionId } = req.body;
