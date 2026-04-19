@@ -37,7 +37,6 @@ const runAllCases = async (code, expectedRaw) => {
   return { status: allPass ? 'PASS' : 'FAIL', output: displayOutput || '', results, isMulti };
 };
 
-// Run only — no DB save
 exports.runCodeOnly = async (req, res) => {
   try {
     const { code, questionId, overrideExpected } = req.body;
@@ -49,16 +48,30 @@ exports.runCodeOnly = async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// Save pre-verified results — no re-run
+// Save pre-verified results with per-case code snapshots
 exports.saveSubmission = async (req, res) => {
   try {
     const { code, questionId, status, output, results } = req.body;
     const question = await prisma.question.findUnique({ where: { id: parseInt(questionId) } });
     if (!question) return res.status(404).json({ error: 'Question not found' });
+
+    // Store results + per-case code snapshots as JSON in output field
+    const fullOutput = JSON.stringify({
+      summary: output || '',
+      cases: results.map((r, i) => ({
+        case: i + 1,
+        input: r.input,
+        expected: r.expected,
+        actual: r.actual,
+        pass: r.pass,
+        code: r.codeSnapshot || code
+      }))
+    });
+
     const sub = await prisma.submission.create({
       data: {
         code,
-        output: output || '',
+        output: fullOutput,
         status: status === 'PASS' ? 'PASS' : 'FAIL',
         userId: req.user.id,
         questionId: parseInt(questionId)
@@ -68,7 +81,6 @@ exports.saveSubmission = async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// Original submit (run + save) — kept for fallback
 exports.submit = async (req, res) => {
   try {
     const { code, questionId } = req.body;
