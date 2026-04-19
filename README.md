@@ -4,9 +4,9 @@
 
 ## 🚀 Overview
 
-CodeExec is a full-stack web application integrated with a complete end-to-end DevOps pipeline. The project automates the process of building, analyzing, containerizing, and deploying the application using modern DevOps tools.
+CodeExec is a full-stack web application integrated with a complete end-to-end DevOps pipeline. The system automates building, code quality analysis, containerization, and deployment.
 
-The system ensures that every code change is automatically tested, analyzed for quality, and deployed without manual intervention.
+Every code change goes through an automated pipeline and is deployed without manual effort.
 
 ---
 
@@ -21,7 +21,7 @@ The system ensures that every code change is automatically tested, analyzed for 
 ### DevOps Tools
 
 - GitHub – Source Code Management
-- Jenkins – CI/CD Pipeline Automation
+- Jenkins – CI/CD Automation
 - SonarQube – Code Quality Analysis
 - Docker – Containerization
 - Ansible – Deployment Automation
@@ -34,15 +34,127 @@ The system ensures that every code change is automatically tested, analyzed for 
 GitHub → Jenkins → SonarQube → Docker → Ansible → Running Application
 ```
 
-### Steps:
+---
 
-1. Code is pushed to GitHub
-2. Jenkins pipeline is triggered
-3. Dependencies are installed (backend & frontend)
-4. SonarQube performs code quality analysis
-5. Docker builds application images
-6. Ansible deploys the application containers
-7. Application becomes live
+## ⚙️ COMPLETE SETUP (FOLLOW THIS ORDER EXACTLY)
+
+---
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/nikhil8995/CodeExec.git
+cd CodeExec
+```
+
+---
+
+### 2. Build Custom Jenkins Image (MANDATORY)
+
+```bash
+docker build -t custom-jenkins ./jenkins
+```
+
+Why this is required:
+
+- Default Jenkins does NOT have npm, Docker, or Ansible
+- Without this → pipeline WILL fail
+
+This image includes:
+
+- Node.js & npm
+- Docker CLI
+- Ansible
+- Sonar Scanner
+
+---
+
+### 3. Start DevOps Infrastructure
+
+```bash
+ansible-playbook ansible/setup-devops.yml
+```
+
+This will:
+
+- Start Jenkins (using custom image)
+- Start SonarQube (with persistent storage)
+- Create Docker network
+
+⏳ Wait ~1–2 minutes for SonarQube to fully start
+
+---
+
+### 4. Access Services
+
+- Jenkins: http://localhost:8080
+- SonarQube: http://localhost:9000
+
+---
+
+### 5. SonarQube Setup
+
+- Login: `admin / admin`
+- Change password
+- Go to **My Account → Security**
+- Generate token
+
+---
+
+### 6. Jenkins Setup
+
+Unlock Jenkins:
+
+```bash
+docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+Then:
+
+- Install suggested plugins
+- Go to **Manage Jenkins → Credentials**
+- Add Secret Text:
+  - ID: `sonar-token`
+  - Value: your Sonar token
+
+---
+
+### 7. Create Pipeline
+
+- New Item → Pipeline
+- Pipeline from SCM
+- GitHub repo URL
+- Branch: `main`
+- Script path: `Jenkinsfile`
+
+---
+
+### 8. Run Pipeline
+
+Click **Build Now**
+
+Pipeline will:
+
+- Install dependencies
+- Run SonarQube analysis
+- Build Docker images
+- Deploy using Ansible
+
+---
+
+## 📦 Deployment (Manual Option)
+
+```bash
+ansible-playbook ansible/playbook.yml
+```
+
+This:
+
+- Stops old containers
+- Starts PostgreSQL
+- Runs backend
+- Runs frontend
+- Applies DB migrations
 
 ---
 
@@ -55,108 +167,35 @@ GitHub → Jenkins → SonarQube → Docker → Ansible → Running Application
 
 ---
 
-## ⚙️ Infrastructure Setup (IMPORTANT)
-
-Before running the pipeline, DevOps tools must be started:
-
-```bash
-ansible-playbook ansible/setup-devops.yml
-```
-
-This sets up:
-
-- Jenkins (custom Docker image with tools installed)
-- SonarQube (with persistent storage)
-- Docker network for communication
-
----
-
-## 🐳 Custom Jenkins Setup
-
-A custom Jenkins Docker image is used with pre-installed tools:
-
-- Node.js & npm
-- Docker CLI
-- Ansible
-- Sonar Scanner
-
-### Why?
-
-To ensure Jenkins always has required tools and does not break after restart.
-
----
-
-## 📦 Deployment using Ansible
-
-Run:
-
-```bash
-ansible-playbook ansible/playbook.yml
-```
-
-This performs:
-
-- Stops old containers
-- Creates Docker network
-- Starts PostgreSQL
-- Waits for database readiness
-- Runs backend container
-- Executes database migrations
-- Runs frontend container
-
----
-
-## 🔍 SonarQube Integration
-
-- Automatically runs during Jenkins pipeline
-
-- Checks for:
-  - Bugs
-  - Code smells
-  - Security issues
-
-- Results available at:
-  http://localhost:9000
-
----
-
-## 🔐 Authentication Handling
-
-- SonarQube uses a **token-based authentication system**
-- Token is securely stored in Jenkins credentials
-- Ensures secure communication between Jenkins and SonarQube
-
----
-
 ## 💾 Data Persistence
 
 Docker volumes are used for:
 
-- Jenkins configuration (`jenkins_home`)
-- SonarQube data (users, tokens, reports)
+- Jenkins (`jenkins_home`)
+- SonarQube (data, users, tokens)
 
 This ensures:
 
-> Data is not lost even after container restart
+> Restart ≠ Data loss
 
 ---
 
 ## 🌐 Docker Networking
 
-A custom Docker network is used:
+Custom network:
 
 ```text
 codeexec-network
 ```
 
-This allows:
+Allows:
 
-- Backend to connect to PostgreSQL
-- Services to communicate using container names
+- Backend ↔ Database communication
+- Service-to-service communication using names
 
 ---
 
-## 🧪 API Testing Example
+## 🧪 API Test
 
 ```bash
 curl -X POST http://localhost:4000/api/auth/register \
@@ -166,9 +205,7 @@ curl -X POST http://localhost:4000/api/auth/register \
 
 ---
 
-## 🧨 Utility Script
-
-To stop everything:
+## 🧨 Stop Everything
 
 ```bash
 ./stop-everything.sh
@@ -176,38 +213,38 @@ To stop everything:
 
 ---
 
-## 📌 Key Features
+## ⚠️ Common Issues & Fixes
 
-- Fully automated CI/CD pipeline
-- Code quality analysis integration
-- Containerized architecture
-- One-command deployment
-- Persistent infrastructure setup
-- Reproducible environment
+| Problem                  | Fix                      |
+| ------------------------ | ------------------------ |
+| npm not found            | Use custom Jenkins image |
+| Docker permission error  | Add Docker group access  |
+| Sonar login fails        | Regenerate token         |
+| Containers can't connect | Use Docker network       |
+| Data lost on restart     | Use Docker volumes       |
 
 ---
 
-## ⚠️ Challenges & Solutions
+## 📌 Key Features
 
-| Problem                        | Solution                                        |
-| ------------------------------ | ----------------------------------------------- |
-| Jenkins missing tools          | Created custom Jenkins Docker image             |
-| Docker permission issues       | Added Docker socket + correct group permissions |
-| SonarQube reset on restart     | Added Docker volumes                            |
-| Container communication issues | Used Docker network                             |
-| Token authentication failure   | Stored token securely in Jenkins                |
+- Fully automated CI/CD pipeline
+- Code quality checks (SonarQube)
+- Containerized deployment
+- One-command setup
+- Persistent infrastructure
+- Reproducible environment
 
 ---
 
 ## 🎯 Conclusion
 
-This project demonstrates how automation simplifies the development and deployment lifecycle. By integrating Jenkins, SonarQube, Docker, and Ansible, the system ensures reliable deployments and improved code quality. It highlights the importance of automation, consistency, and scalability in modern software development practices.
+This project demonstrates how automation simplifies development and deployment. By integrating Jenkins, SonarQube, Docker, and Ansible, the system ensures reliable builds, better code quality, and consistent deployment. It highlights how DevOps practices improve efficiency and reduce manual errors.
 
 ---
 
 ## 📚 References
 
-- Docker Documentation
-- Jenkins Documentation
-- SonarQube Documentation
-- Ansible Documentation
+- Docker Docs
+- Jenkins Docs
+- SonarQube Docs
+- Ansible Docs
