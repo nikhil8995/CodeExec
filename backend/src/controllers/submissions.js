@@ -1,23 +1,24 @@
 const prisma = require('../utils/prisma');
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// ── run code directly (no external runner file needed) ────────────
+// ── run code with stdin piped in ──────────────────────────────────
 const runCode = (code, stdin = '') => new Promise((resolve) => {
   const tmpFile = path.join(os.tmpdir(), `ce_${Date.now()}_${Math.random().toString(36).slice(2)}.js`);
   fs.writeFileSync(tmpFile, code);
 
-  execFile('node', [tmpFile], {
-    timeout: 6000,
-    encoding: 'utf8',
-    env: { ...process.env, CE_STDIN: stdin },
-  }, (err, stdout, stderr) => {
+  const child = exec(`node "${tmpFile}"`, { timeout: 6000 }, (err, stdout, stderr) => {
     try { fs.unlinkSync(tmpFile); } catch {}
-    if (err) resolve({ output: (stderr || err.message || 'Runtime error').trim(), error: true });
+    if (err && !stdout) resolve({ output: (stderr || err.message || 'Runtime error').trim(), error: true });
     else resolve({ output: stdout.trim(), error: false });
   });
+
+  if (stdin) {
+    child.stdin.write(stdin);
+    child.stdin.end();
+  }
 });
 
 // ── parse expected output ─────────────────────────────────────────

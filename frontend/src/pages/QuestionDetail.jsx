@@ -5,7 +5,6 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 
-// ── Timer hook ────────────────────────────────────────────────────
 function useCountdown(seconds, onExpire) {
   const [timeLeft, setTimeLeft] = useState(seconds)
   const expired = useRef(false)
@@ -37,13 +36,14 @@ function fmt(s) {
   return `${m}:${sec}`
 }
 
-// ── Result panel ──────────────────────────────────────────────────
 function ResultPanel({ result }) {
   if (!result) return null
   const pass = result.status === 'PASS'
+
   return (
     <Card className={`border ${pass ? 'border-emerald-700/50 bg-emerald-900/10' : 'border-red-700/50 bg-red-900/10'} animate-fadeIn`}>
-      <div className="flex items-center gap-3 mb-3">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
         <span className={`text-2xl ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{pass ? '✓' : '✗'}</span>
         <div>
           <Badge label={result.status} />
@@ -55,23 +55,41 @@ function ResultPanel({ result }) {
         </div>
       </div>
 
-      {/* Multi test case breakdown */}
-      {result.isMulti && result.results?.length > 0 && (
-        <div className="space-y-2 mb-3">
+      {/* Test case breakdown — always shown */}
+      {result.results && result.results.length > 0 && (
+        <div className="space-y-3">
           {result.results.map((r, i) => (
-            <div key={i} className={`rounded-lg px-3 py-2 border text-xs font-mono ${r.pass ? 'border-emerald-800/50 bg-emerald-950/30' : 'border-red-800/50 bg-red-950/30'}`}>
-              <span className={r.pass ? 'text-emerald-400' : 'text-red-400'}>{r.pass ? '✓' : '✗'} </span>
-              <span className="text-slate-500">Case {i + 1}</span>
-              {r.input && <> · <span className="text-slate-400">in: <span className="text-slate-300">{r.input}</span></span></>}
-              <> · <span className="text-slate-400">got: <span className="text-slate-300">{r.actual}</span></span></>
-              {!r.pass && <> · <span className="text-slate-400">want: <span className="text-emerald-400">{r.expected}</span></span></>}
+            <div key={i} className={`rounded-xl border overflow-hidden ${r.pass ? 'border-emerald-800/40' : 'border-red-800/40'}`}>
+              {/* Case header */}
+              <div className={`flex items-center justify-between px-3 py-2 text-xs font-mono ${r.pass ? 'bg-emerald-950/40 text-emerald-400' : 'bg-red-950/40 text-red-400'}`}>
+                <span>{r.pass ? '✓' : '✗'} Case {i + 1}</span>
+                <Badge label={r.pass ? 'PASS' : 'FAIL'} />
+              </div>
+
+              {/* Case details */}
+              <div className="bg-dark-900 px-3 py-3 space-y-2">
+                {r.input !== undefined && r.input !== '' && (
+                  <div className="flex gap-3 text-xs font-mono">
+                    <span className="text-slate-500 w-16 flex-shrink-0">Input</span>
+                    <span className="text-slate-300">{r.input}</span>
+                  </div>
+                )}
+                <div className="flex gap-3 text-xs font-mono">
+                  <span className="text-slate-500 w-16 flex-shrink-0">Expected</span>
+                  <span className="text-emerald-400">{r.expected}</span>
+                </div>
+                <div className="flex gap-3 text-xs font-mono">
+                  <span className="text-slate-500 w-16 flex-shrink-0">Got</span>
+                  <span className={r.pass ? 'text-emerald-400' : 'text-red-400'}>{r.actual || '(empty)'}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Single output */}
-      {!result.isMulti && (
+      {/* Single (non-multi) fallback */}
+      {(!result.results || result.results.length === 0) && (
         <div className="space-y-2">
           <div>
             <p className="text-xs text-slate-500 mb-1">Your Output:</p>
@@ -89,7 +107,6 @@ function ResultPanel({ result }) {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────
 export default function QuestionDetail() {
   const { id } = useParams()
   const [question, setQuestion] = useState(null)
@@ -107,7 +124,6 @@ export default function QuestionDetail() {
     }).finally(() => setFetching(false))
   }, [id])
 
-  // FEATURE 4: auto-submit on timer expire
   const handleAutoSubmit = useCallback(() => {
     if (submitted) return
     doSubmit()
@@ -115,8 +131,8 @@ export default function QuestionDetail() {
   }, [submitted, code])
 
   const timeLeft = useCountdown(question?.timeLimit || 0, handleAutoSubmit)
+  const timerColor = timeLeft <= 30 ? 'text-red-400 animate-pulse' : timeLeft <= 60 ? 'text-yellow-400' : 'text-slate-400'
 
-  // FEATURE 1: run only
   const handleRun = async () => {
     setRunning(true)
     setResult(null)
@@ -124,13 +140,12 @@ export default function QuestionDetail() {
       const { data } = await api.post('/submissions/run', { code, questionId: id })
       setResult(data)
     } catch (e) {
-      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false })
+      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false, results: [] })
     } finally {
       setRunning(false)
     }
   }
 
-  // FEATURE 1: submit and save
   const doSubmit = async () => {
     if (submitted) return
     setSubmitting(true)
@@ -140,29 +155,22 @@ export default function QuestionDetail() {
       setResult(data)
       setSubmitted(true)
     } catch (e) {
-      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false })
+      setResult({ status: 'FAIL', output: e.response?.data?.error || 'Execution error', saved: false, results: [] })
     } finally {
       setSubmitting(false)
     }
   }
-
-  const handleSubmit = () => doSubmit()
-
-  // Timer colour
-  const timerColor = timeLeft <= 30 ? 'text-red-400 animate-pulse' : timeLeft <= 60 ? 'text-yellow-400' : 'text-slate-400'
 
   if (fetching) return <div className="text-center py-16 text-slate-500">Loading...</div>
   if (!question) return <div className="text-center py-16 text-red-400">Question not found.</div>
 
   return (
     <div className="max-w-5xl mx-auto animate-fadeIn">
-      {/* FEATURE 4: Timer bar */}
+      {/* Timer */}
       {question.timeLimit > 0 && (
         <div className="flex items-center justify-end mb-4 gap-3">
           <span className="text-xs text-slate-500 font-mono uppercase tracking-wider">Time Remaining</span>
-          <div className={`font-mono text-xl font-bold tabular-nums ${timerColor}`}>
-            {fmt(timeLeft)}
-          </div>
+          <div className={`font-mono text-xl font-bold tabular-nums ${timerColor}`}>{fmt(timeLeft)}</div>
           {submitted && <span className="text-xs text-emerald-500 font-mono">● submitted</span>}
         </div>
       )}
@@ -190,7 +198,7 @@ export default function QuestionDetail() {
           <ResultPanel result={result} />
         </div>
 
-        {/* Right panel – editor */}
+        {/* Right panel */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -211,7 +219,6 @@ export default function QuestionDetail() {
             disabled={submitted}
           />
 
-          {/* FEATURE 1: two buttons */}
           <div className="flex gap-3">
             <Button
               variant="secondary"
@@ -223,7 +230,7 @@ export default function QuestionDetail() {
             </Button>
             <Button
               className="flex-1 justify-center"
-              onClick={handleSubmit}
+              onClick={doSubmit}
               loading={submitting}
               disabled={!code.trim() || running || submitted}>
               {submitted ? '✓ Submitted' : '↑ Submit'}
@@ -231,9 +238,7 @@ export default function QuestionDetail() {
           </div>
 
           {submitted && (
-            <p className="text-center text-xs text-slate-500">
-              Submission locked. Refresh to start over.
-            </p>
+            <p className="text-center text-xs text-slate-500">Submission locked. Refresh to start over.</p>
           )}
         </div>
       </div>
