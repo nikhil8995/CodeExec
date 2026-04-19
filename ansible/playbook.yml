@@ -22,6 +22,16 @@
       command: docker network create codeexec-network
       when: network_check.rc != 0
 
+    # 🔥 NEW: Ensure volume exists
+    - name: Check if postgres volume exists
+      command: docker volume inspect postgres_data
+      register: volume_check
+      ignore_errors: true
+
+    - name: Create postgres volume if not exists
+      command: docker volume create postgres_data
+      when: volume_check.rc != 0
+
     - name: Run PostgreSQL
       command: >
         docker run -d
@@ -30,6 +40,7 @@
         -e POSTGRES_USER={{ postgres_user }}
         -e POSTGRES_PASSWORD={{ postgres_password }}
         -e POSTGRES_DB={{ postgres_db }}
+        -v postgres_data:/var/lib/postgresql/data
         -p 5433:5432
         --restart unless-stopped
         postgres:15
