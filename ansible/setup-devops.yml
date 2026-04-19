@@ -1,0 +1,50 @@
+---
+- name: Setup DevOps Tools
+  hosts: localhost
+  connection: local
+
+  tasks:
+    # 🔻 Ensure network exists (clean way)
+    - name: Check if devops network exists
+      command: docker network inspect devops-network
+      register: network_check
+      ignore_errors: true
+
+    - name: Create devops network if not exists
+      command: docker network create devops-network
+      when: network_check.rc != 0
+
+    # 🔻 Remove old containers (fix your current issue)
+    - name: Remove old SonarQube container if exists
+      command: docker rm -f sonarqube
+      ignore_errors: true
+
+    - name: Remove old Jenkins container if exists
+      command: docker rm -f jenkins
+      ignore_errors: true
+
+    # 🔻 Run SonarQube
+    - name: Run SonarQube
+      command: >
+        docker run -d
+        --name sonarqube
+        --network devops-network
+        -p 9000:9000
+        -v sonarqube_data:/opt/sonarqube/data
+        -v sonarqube_extensions:/opt/sonarqube/extensions
+        -v sonarqube_logs:/opt/sonarqube/logs
+        --restart unless-stopped
+        sonarqube
+
+    # 🔻 Run Jenkins
+    - name: Run Jenkins
+      command: >
+        docker run -d
+        --name jenkins
+        --network devops-network
+        -p 8080:8080
+        -p 50000:50000
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v jenkins_home:/var/jenkins_home
+        --restart unless-stopped
+        my-jenkins
