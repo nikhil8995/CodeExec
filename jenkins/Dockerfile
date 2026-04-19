@@ -2,7 +2,6 @@ FROM jenkins/jenkins:lts
 
 USER root
 
-# Fix SSL + install required tools
 RUN apt-get update && \
     apt-get install -y \
     ca-certificates \
@@ -20,5 +19,8 @@ RUN wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-s
     mv /opt/sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner && \
     ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/bin/sonar-scanner && \
     rm /tmp/sonar.zip
+# 🔥 IMPORTANT FIX
+RUN usermod -aG docker jenkins
 
 USER jenkins
+

@@ -46,5 +46,6 @@
         -p 50000:50000
         -v /var/run/docker.sock:/var/run/docker.sock
         -v jenkins_home:/var/jenkins_home
+        --group-add 960
         --restart unless-stopped
         my-jenkins
