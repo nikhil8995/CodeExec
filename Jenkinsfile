@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        SONAR_HOST = 'http://host.docker.internal:9000'
         SONAR_TOKEN = credentials('sonar-token')
     }
 
@@ -43,9 +42,9 @@ pipeline {
             }
         }
 
-        stage('Deploy with Ansible') {
+        stage('Deploy to AWS') {
             steps {
-                sh 'ansible-playbook ansible/playbook.yml'
+                sh 'ansible-playbook ansible/deploy.yml -i ansible/inventory.ini'
             }
         }
 

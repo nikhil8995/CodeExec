@@ -1,0 +1,51 @@
+---
+- name: Provision EC2 instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /home/nikhil/miniconda3/bin/python3
+    region: ap-south-1
+    instance_type: t3.micro
+    ami_id: ami-03f4878755434977f
+    key_name: codeexec-key
+    security_group_name: codeexec-sg
+
+  tasks:
+    - name: Create security group
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: CodeExec SG
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [4000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5173]
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+    - name: Launch EC2
+      amazon.aws.ec2_instance:
+        name: codeexec-server
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_groups: ["{{ security_group_name }}"]
+        network:
+          assign_public_ip: true
+        wait: true
+        state: running
+      register: ec2
+
+    - name: Print Public IP
+      debug:
+        msg: "EC2 IP: {{ ec2.instances[0].public_ip_address }}"
