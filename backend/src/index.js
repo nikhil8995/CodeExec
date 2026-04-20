@@ -8,6 +8,9 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
+
+  // 🔥 ADD THIS (YOUR EC2 FRONTEND)
+  'http://3.110.33.106:5173'
 ];
 
 app.use(cors({
