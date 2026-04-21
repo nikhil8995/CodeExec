@@ -1,52 +1,20 @@
 pipeline {
     agent any
 
-    environment {
-        SONAR_TOKEN = credentials('sonar-token')
-    }
-
     stages {
 
-        stage('Install Backend') {
+        stage('Pull Code') {
             steps {
-                dir('backend') {
-                    sh 'npm install'
-                }
+                git 'https://github.com/nikhil8995/CodeExec.git'
             }
         }
 
-        stage('Install Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'npm install'
-                }
-            }
-        }
-
-        stage('SonarQube Analysis') {
+        stage('Deploy to AWS via Ansible') {
             steps {
                 sh '''
-                sonar-scanner \
-                -Dsonar.projectKey=codeexec \
-                -Dsonar.sources=backend,frontend \
-                -Dsonar.host.url=http://sonarqube:9000 \
-                -Dsonar.token=${SONAR_TOKEN}
+                ansible-playbook ansible/deploy.yml -i ansible/inventory.ini
                 '''
             }
         }
-
-        stage('Build Docker Images') {
-            steps {
-                sh 'docker build -t codeexec-backend ./backend'
-                sh 'docker build -t codeexec-frontend ./frontend'
-            }
-        }
-
-        stage('Deploy to AWS') {
-            steps {
-                sh 'ansible-playbook ansible/deploy.yml -i ansible/inventory.ini'
-            }
-        }
-
     }
 }
