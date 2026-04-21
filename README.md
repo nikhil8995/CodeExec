@@ -1,107 +1,67 @@
 # CodeExec – DevOps Enabled Full Stack Application
 
----
+CodeExec is a full-stack web app with a Jenkins + Ansible deployment pipeline. The pipeline provisions or reuses EC2, builds Docker images, starts PostgreSQL, backend, and frontend containers, and serves the React app from a production static build.
 
-## 🚀 Overview
+## Stack
 
-CodeExec is a full-stack web application integrated with a complete end-to-end DevOps pipeline. The system automates building, code quality analysis, containerization, and deployment.
-
-Every code change goes through an automated pipeline and is deployed without manual effort.
-
----
-
-## 🛠️ Tech Stack
-
-### Application
-
-- Frontend: React (Vite)
-- Backend: Node.js (Express)
+- Frontend: React + Vite
+- Backend: Node.js + Express
 - Database: PostgreSQL
+- CI/CD: Jenkins + Ansible
+- Containerization: Docker
 
-### DevOps Tools
+## How To Run
 
-- GitHub – Source Code Management
-- Jenkins – CI/CD Automation
-- SonarQube – Code Quality Analysis
-- Docker – Containerization
-- Ansible – Deployment Automation
+### 1. Start Docker on the host
 
----
+Run this on the machine that will host Jenkins, SonarQube, and the deployment containers.
 
-## 🔄 CI/CD Pipeline Flow
-
-```text
-GitHub → Jenkins → SonarQube → Docker → Ansible → Running Application
+```bash
+sudo systemctl start docker
+sudo systemctl enable docker
+docker ps
 ```
 
----
+If Docker complains about permissions, add your user to the `docker` group and log out/in again.
 
-## ⚙️ COMPLETE SETUP (FOLLOW THIS ORDER EXACTLY)
-
----
-
-### 1. Clone the Repository
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/nikhil8995/CodeExec.git
 cd CodeExec
 ```
 
----
-
-### 2. Build Custom Jenkins Image (MANDATORY)
+### 3. Build the custom Jenkins image
 
 ```bash
-docker build -t custom-jenkins ./jenkins
+docker build -t my-jenkins ./jenkins
 ```
 
-Why this is required:
+This image provides the tools Jenkins needs for the pipeline:
 
-- Default Jenkins does NOT have npm, Docker, or Ansible
-- Without this → pipeline WILL fail
-
-This image includes:
-
-- Node.js & npm
+- Node.js and npm
 - Docker CLI
 - Ansible
 - Sonar Scanner
 
----
-
-### 3. Start DevOps Infrastructure
+### 4. Start Jenkins and SonarQube
 
 ```bash
 ansible-playbook ansible/setup-devops.yml
 ```
 
-This will:
+Wait 1 to 2 minutes for SonarQube to finish starting.
 
-- Start Jenkins (using custom image)
-- Start SonarQube (with persistent storage)
-- Create Docker network
-
-⏳ Wait ~1–2 minutes for SonarQube to fully start
-
----
-
-### 4. Access Services
+Open:
 
 - Jenkins: http://localhost:8080
 - SonarQube: http://localhost:9000
 
----
+### 5. Configure SonarQube
 
-### 5. SonarQube Setup
+Log in with `admin / admin`, change the password, then go to **My Account → Security** and generate a token.
 
-- Login: `admin / admin`
-- Change password
-- Go to **My Account → Security**
-- Generate token
-
----
-
-### 6. Jenkins Setup
+### 6. Configure Jenkins
 
 Unlock Jenkins:
 
@@ -111,140 +71,66 @@ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 
 Then:
 
-- Install suggested plugins
-- Go to **Manage Jenkins → Credentials**
-- Add Secret Text:
-  - ID: `sonar-token`
-  - Value: your Sonar token
+- Install the suggested plugins
+- Add a Jenkins credential with ID `sonar-token`
+- Add AWS credentials with IDs `aws-access-key` and `aws-secret-key`
 
----
+### 7. Create the pipeline job
 
-### 7. Create Pipeline
+Create a new Pipeline job in Jenkins and point it to this repository:
 
-- New Item → Pipeline
 - Pipeline from SCM
-- GitHub repo URL
+- Repository URL: this repo
 - Branch: `main`
 - Script path: `Jenkinsfile`
 
----
+### 8. Run the pipeline
 
-### 8. Run Pipeline
+Click **Build Now**.
 
-Click **Build Now**
+The pipeline will:
 
-Pipeline will:
-
-- Install dependencies
 - Run SonarQube analysis
-- Build Docker images
-- Deploy using Ansible
+- Deploy to AWS through `ansible/deploy.yml`
+- Clone the repo onto EC2
+- Build backend and frontend Docker images
+- Start PostgreSQL, backend, and frontend
+- Apply Prisma migrations
 
----
+### 9. Open the website
 
-## 📦 Deployment (Manual Option)
+After deploy, open the frontend in your browser:
+
+- http://<EC2-IP>:5173
+
+You will find the EC2-IP in the console of jenkins.
+Use the current EC2 public IP from the deployment output.
+
+## Manual Deploy
+
+If you want to run the app deployment without Jenkins:
 
 ```bash
 ansible-playbook ansible/deploy.yml
 ```
 
-This:
-
-- Stops old containers
-- Starts PostgreSQL
-- Runs backend
-- Runs frontend
-- Applies DB migrations
-
----
-
-## 🌐 Application URLs
-
-- Frontend: http://localhost:5173
-- Backend: http://localhost:4000
-- SonarQube: http://localhost:9000
-- Jenkins: http://localhost:8080
-
----
-
-## 💾 Data Persistence
-
-Docker volumes are used for:
-
-- Jenkins (`jenkins_home`)
-- SonarQube (data, users, tokens)
-
-This ensures:
-
-> Restart ≠ Data loss
-
----
-
-## 🌐 Docker Networking
-
-Custom network:
-
-```text
-codeexec-network
-```
-
-Allows:
-
-- Backend ↔ Database communication
-- Service-to-service communication using names
-
----
-
-## 🧪 API Test
+## Quick Checks
 
 ```bash
+curl http://localhost:4000/api/health
 curl -X POST http://localhost:4000/api/auth/register \
--H "Content-Type: application/json" \
--d '{"name":"test","email":"test@test.com","password":"123456"}'
+  -H "Content-Type: application/json" \
+  -d '{"name":"test","email":"test@test.com","password":"123456"}'
 ```
 
----
-
-## 🧨 Stop Everything
+## Stop Everything
 
 ```bash
 ./stop-everything.sh
 ```
 
----
+## Notes
 
-## ⚠️ Common Issues & Fixes
-
-| Problem                  | Fix                      |
-| ------------------------ | ------------------------ |
-| npm not found            | Use custom Jenkins image |
-| Docker permission error  | Add Docker group access  |
-| Sonar login fails        | Regenerate token         |
-| Containers can't connect | Use Docker network       |
-| Data lost on restart     | Use Docker volumes       |
-
----
-
-## 📌 Key Features
-
-- Fully automated CI/CD pipeline
-- Code quality checks (SonarQube)
-- Containerized deployment
-- One-command setup
-- Persistent infrastructure
-- Reproducible environment
-
----
-
-## 🎯 Conclusion
-
-This project demonstrates how automation simplifies development and deployment. By integrating Jenkins, SonarQube, Docker, and Ansible, the system ensures reliable builds, better code quality, and consistent deployment. It highlights how DevOps practices improve efficiency and reduce manual errors.
-
----
-
-## 📚 References
-
-- Docker Docs
-- Jenkins Docs
-- SonarQube Docs
-- Ansible Docs
+- `ansible/deploy.yml` is the active deployment playbook.
+- The frontend Docker image serves the built `dist` folder, not the Vite dev server.
+- If the EC2 public IP changes, update the frontend URL accordingly.
