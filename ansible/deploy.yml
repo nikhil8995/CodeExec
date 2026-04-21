@@ -1,8 +1,8 @@
 ---
 # =========================
-# 1. PROVISION EC2
+# 1. PROVISION / REUSE EC2
 # =========================
-- name: Provision EC2 instance
+- name: Provision or reuse EC2
   hosts: localhost
   connection: local
   gather_facts: false
@@ -16,6 +16,14 @@
     security_group_name: codeexec-sg
 
   tasks:
+    - name: Check for existing EC2
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "codeexec-server"
+          instance-state-name: ["running"]
+      register: ec2_info
+
     - name: Create security group
       amazon.aws.ec2_security_group:
         name: "{{ security_group_name }}"
@@ -35,7 +43,7 @@
           - proto: all
             cidr_ip: 0.0.0.0/0
 
-    - name: Launch EC2
+    - name: Launch EC2 if not exists
       amazon.aws.ec2_instance:
         name: codeexec-server
         region: "{{ region }}"
@@ -47,11 +55,23 @@
           assign_public_ip: true
         wait: true
         state: running
-      register: ec2
+        tags:
+          Name: codeexec-server
+      when: ec2_info.instances | length == 0
+      register: ec2_new
+
+    - name: Set EC2 IP
+      set_fact:
+        ec2_ip: >-
+          {{
+            (ec2_info.instances[0].public_ip_address
+            if ec2_info.instances | length > 0
+            else ec2_new.instances[0].public_ip_address)
+          }}
 
     - name: Add instance to inventory
       add_host:
-        name: "{{ ec2.instances[0].public_ip_address }}"
+        name: "{{ ec2_ip }}"
         groups: codeexec
         ansible_user: ubuntu
         ansible_ssh_private_key_file: /root/.ssh/codeexec-key.pem
@@ -59,17 +79,17 @@
 
     - name: Wait for SSH
       wait_for:
-        host: "{{ ec2.instances[0].public_ip_address }}"
+        host: "{{ ec2_ip }}"
         port: 22
         delay: 15
         timeout: 180
 
-    - name: Print Public IP
+    - name: Print EC2 IP
       debug:
-        msg: "EC2 IP: {{ ec2.instances[0].public_ip_address }}"
+        msg: "EC2 IP: {{ ec2_ip }}"
 
 # =========================
-# 2. DEPLOY APP ON EC2
+# 2. DEPLOY APP
 # =========================
 - name: Setup EC2 and deploy CodeExec
   hosts: codeexec
@@ -91,7 +111,7 @@
         state: started
         enabled: true
 
-    - name: Add ubuntu user to docker group
+    - name: Add ubuntu to docker group
       user:
         name: ubuntu
         groups: docker
@@ -109,7 +129,7 @@
         version: main
         force: yes
 
-    - name: Create Docker network
+    - name: Create network
       command: docker network create codeexec-network
       ignore_errors: true
 
