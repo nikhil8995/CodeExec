@@ -145,7 +145,7 @@ Pipeline will:
 ## 📦 Deployment (Manual Option)
 
 ```bash
-ansible-playbook ansible/playbook.yml
+ansible-playbook ansible/deploy.yml
 ```
 
 This:

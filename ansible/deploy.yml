@@ -96,6 +96,14 @@
   become: true
 
   tasks:
+    - name: Remove existing frontend container if present
+      command: docker rm -f codeexec-frontend
+      ignore_errors: true
+
+    - name: Remove existing backend container if present
+      command: docker rm -f codeexec-backend
+      ignore_errors: true
+
     - name: Update packages
       apt:
         update_cache: yes
@@ -153,7 +161,7 @@
         seconds: 10
 
     - name: Build backend
-      command: docker build -t codeexec-backend /home/ubuntu/CodeExec/backend
+      command: docker build --no-cache -t codeexec-backend /home/ubuntu/CodeExec/backend
 
     - name: Run backend
       command: >
