@@ -1,10 +1,6 @@
 import axios from 'axios'
 
-// 🔥 FIX: Force correct backend URL (EC2)
-// Use env if available, otherwise fallback to EC2 NOT localhost
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'http://3.110.33.106:4000/api'
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://3.110.33.106:4000/api').replace(/\/$/, '')
 
 const api = axios.create({
   baseURL: BASE_URL,
