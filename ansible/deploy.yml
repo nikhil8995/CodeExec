@@ -1,4 +1,7 @@
 ---
+# =========================
+# 1. PROVISION EC2
+# =========================
 - name: Provision EC2 instance
   hosts: localhost
   connection: local
@@ -64,3 +67,98 @@
     - name: Print Public IP
       debug:
         msg: "EC2 IP: {{ ec2.instances[0].public_ip_address }}"
+
+# =========================
+# 2. DEPLOY APP ON EC2
+# =========================
+- name: Setup EC2 and deploy CodeExec
+  hosts: codeexec
+  become: true
+
+  tasks:
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
+
+    - name: Install Git
+      apt:
+        name: git
+        state: present
+
+    - name: Clone project
+      git:
+        repo: https://github.com/nikhil8995/CodeExec.git
+        dest: /home/ubuntu/CodeExec
+        version: main
+        force: yes
+
+    - name: Create Docker network
+      command: docker network create codeexec-network
+      ignore_errors: true
+
+    - name: Create volume
+      command: docker volume create postgres_data
+      ignore_errors: true
+
+    - name: Run PostgreSQL
+      command: >
+        docker run -d --name codeexec-postgres
+        --network codeexec-network
+        -e POSTGRES_USER=postgres
+        -e POSTGRES_PASSWORD=postgres
+        -e POSTGRES_DB=codeexec
+        -v postgres_data:/var/lib/postgresql/data
+        -p 5432:5432 postgres:15
+      ignore_errors: true
+
+    - name: Wait for DB
+      pause:
+        seconds: 10
+
+    - name: Build backend
+      command: docker build -t codeexec-backend /home/ubuntu/CodeExec/backend
+
+    - name: Run backend
+      command: >
+        docker run -d --name codeexec-backend
+        --network codeexec-network
+        -p 4000:4000
+        -e DATABASE_URL=postgresql://postgres:postgres@codeexec-postgres:5432/codeexec
+        -e JWT_SECRET=supersecret
+        codeexec-backend
+      ignore_errors: true
+
+    - name: Run migrations
+      command: docker exec codeexec-backend npx prisma migrate deploy
+      ignore_errors: true
+
+    - name: Build frontend
+      command: >
+        docker build --no-cache
+        --build-arg VITE_API_URL=http://{{ inventory_hostname }}:4000/api
+        -t codeexec-frontend /home/ubuntu/CodeExec/frontend
+
+    - name: Run frontend
+      command: >
+        docker run -d --name codeexec-frontend
+        --network codeexec-network
+        -p 5173:5173
+        codeexec-frontend
+      ignore_errors: true
