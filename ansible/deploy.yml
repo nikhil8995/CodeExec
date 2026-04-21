@@ -74,7 +74,7 @@
         name: "{{ ec2_ip }}"
         groups: codeexec
         ansible_user: ubuntu
-        ansible_ssh_private_key_file: /root/.ssh/codeexec-key.pem
+        ansible_ssh_private_key_file: /var/jenkins_home/.ssh/codeexec-key.pem
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
     - name: Wait for SSH
