@@ -1,67 +1,66 @@
 ---
-- name: Deploy CodeExec on EC2
-  hosts: codeexec
-  become: true
+- name: Provision EC2 instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /home/nikhil/miniconda3/bin/python3
+    region: ap-south-1
+    instance_type: t3.micro
+    ami_id: ami-03f4878755434977f
+    key_name: codeexec-key
+    security_group_name: codeexec-sg
 
   tasks:
-    - name: Pull latest code
-      git:
-        repo: https://github.com/nikhil8995/CodeExec.git
-        dest: /home/ubuntu/CodeExec
-        version: main
-        force: yes
+    - name: Create security group
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: CodeExec SG
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [4000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5173]
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
 
-    - name: Stop old containers
-      command: docker rm -f codeexec-postgres codeexec-backend codeexec-frontend
-      ignore_errors: true
+    - name: Launch EC2
+      amazon.aws.ec2_instance:
+        name: codeexec-server
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_groups: ["{{ security_group_name }}"]
+        network:
+          assign_public_ip: true
+        wait: true
+        state: running
+      register: ec2
 
-    - name: Create network
-      command: docker network create codeexec-network
-      ignore_errors: true
+    - name: Add instance to inventory
+      add_host:
+        name: "{{ ec2.instances[0].public_ip_address }}"
+        groups: codeexec
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: /root/.ssh/codeexec-key.pem
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
-    - name: Create volume
-      command: docker volume create postgres_data
-      ignore_errors: true
+    - name: Wait for SSH
+      wait_for:
+        host: "{{ ec2.instances[0].public_ip_address }}"
+        port: 22
+        delay: 15
+        timeout: 180
 
-    - name: Run PostgreSQL
-      command: >
-        docker run -d --name codeexec-postgres
-        --network codeexec-network
-        -e POSTGRES_USER=postgres
-        -e POSTGRES_PASSWORD=postgres
-        -e POSTGRES_DB=codeexec
-        -v postgres_data:/var/lib/postgresql/data
-        -p 5432:5432 postgres:15
-
-    - name: Wait for DB
-      pause:
-        seconds: 10
-
-    - name: Build backend
-      command: docker build -t codeexec-backend /home/ubuntu/CodeExec/backend
-
-    - name: Run backend
-      command: >
-        docker run -d --name codeexec-backend
-        --network codeexec-network
-        -p 4000:4000
-        -e DATABASE_URL=postgresql://postgres:postgres@codeexec-postgres:5432/codeexec
-        -e JWT_SECRET=supersecret
-        codeexec-backend
-
-    - name: Run migrations
-      command: docker exec codeexec-backend npx prisma migrate deploy
-      ignore_errors: true
-
-    - name: Build frontend
-      command: >
-        docker build --no-cache
-        --build-arg VITE_API_URL=http://13.127.133.216:4000/api
-        -t codeexec-frontend /home/ubuntu/CodeExec/frontend
-
-    - name: Run frontend
-      command: >
-        docker run -d --name codeexec-frontend
-        --network codeexec-network
-        -p 5173:5173
-        codeexec-frontend
+    - name: Print Public IP
+      debug:
+        msg: "EC2 IP: {{ ec2.instances[0].public_ip_address }}"
