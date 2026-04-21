@@ -5,9 +5,5 @@ WORKDIR /app
 COPY . .
 
 RUN npm install
-RUN npm run build
 
-# install serve
-RUN npm install -g serve
-
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["npm", "run", "dev"]
