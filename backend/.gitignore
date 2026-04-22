@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Coverage
+coverage/
+coverage-e2e/
+
+# Prisma generated
+prisma/*.db
+prisma/*.db-journal
