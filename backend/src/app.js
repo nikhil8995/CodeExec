@@ -1,6 +1,6 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+
 const app = express();
 
 const allowedOrigins = [
@@ -8,7 +8,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
-  'http://13.127.231.58:5173' // 🔥 ADD THIS
+  'http://13.127.231.58:5173'
 ];
 
 app.use(cors({

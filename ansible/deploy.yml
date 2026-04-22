@@ -31,13 +31,7 @@
         region: "{{ region }}"
         rules:
           - proto: tcp
-            ports: [22]
-            cidr_ip: 0.0.0.0/0
-          - proto: tcp
-            ports: [4000]
-            cidr_ip: 0.0.0.0/0
-          - proto: tcp
-            ports: [5173]
+            ports: [22, 4000, 5173]
             cidr_ip: 0.0.0.0/0
         rules_egress:
           - proto: all
@@ -84,10 +78,6 @@
         delay: 15
         timeout: 180
 
-    - name: Print EC2 IP
-      debug:
-        msg: "EC2 IP: {{ ec2_ip }}"
-
 # =========================
 # 2. DEPLOY APP
 # =========================
@@ -96,13 +86,18 @@
   become: true
 
   tasks:
+    # -------------------------
+    # SYSTEM SETUP
+    # -------------------------
     - name: Update packages
       apt:
         update_cache: yes
 
-    - name: Install Docker
+    - name: Install Docker & Git
       apt:
-        name: docker.io
+        name:
+          - docker.io
+          - git
         state: present
 
     - name: Start Docker
@@ -117,26 +112,40 @@
         groups: docker
         append: true
 
-    - name: Install Git
-      apt:
-        name: git
-        state: present
+    # -------------------------
+    # CLEAN OLD STATE (IMPORTANT)
+    # -------------------------
+    - name: Remove old containers
+      shell: |
+        docker rm -f codeexec-frontend codeexec-backend codeexec-postgres || true
+
+    - name: Ensure network exists
+      shell: |
+        docker network inspect codeexec-network >/dev/null 2>&1 || \
+        docker network create codeexec-network
+
+    - name: Ensure volume exists
+      shell: |
+        docker volume inspect postgres_data >/dev/null 2>&1 || \
+        docker volume create postgres_data
+
+    # -------------------------
+    # CLONE CODE
+    # -------------------------
+    - name: Remove old project
+      file:
+        path: /home/ubuntu/CodeExec
+        state: absent
 
     - name: Clone project
       git:
         repo: https://github.com/nikhil8995/CodeExec.git
         dest: /home/ubuntu/CodeExec
         version: main
-        force: yes
 
-    - name: Create network
-      command: docker network create codeexec-network
-      ignore_errors: true
-
-    - name: Create volume
-      command: docker volume create postgres_data
-      ignore_errors: true
-
+    # -------------------------
+    # START DATABASE
+    # -------------------------
     - name: Run PostgreSQL
       command: >
         docker run -d --name codeexec-postgres
@@ -146,14 +155,18 @@
         -e POSTGRES_DB=codeexec
         -v postgres_data:/var/lib/postgresql/data
         -p 5432:5432 postgres:15
-      ignore_errors: true
 
-    - name: Wait for DB
-      pause:
-        seconds: 10
+    - name: Wait for Postgres
+      shell: |
+        until docker exec codeexec-postgres pg_isready; do
+          sleep 2
+        done
 
+    # -------------------------
+    # BACKEND
+    # -------------------------
     - name: Build backend
-      command: docker build -t codeexec-backend /home/ubuntu/CodeExec/backend
+      command: docker build --no-cache -t codeexec-backend /home/ubuntu/CodeExec/backend
 
     - name: Run backend
       command: >
@@ -163,12 +176,13 @@
         -e DATABASE_URL=postgresql://postgres:postgres@codeexec-postgres:5432/codeexec
         -e JWT_SECRET=supersecret
         codeexec-backend
-      ignore_errors: true
 
     - name: Run migrations
       command: docker exec codeexec-backend npx prisma migrate deploy
-      ignore_errors: true
 
+    # -------------------------
+    # FRONTEND
+    # -------------------------
     - name: Build frontend
       command: >
         docker build --no-cache
@@ -181,4 +195,3 @@
         --network codeexec-network
         -p 5173:5173
         codeexec-frontend
-      ignore_errors: true

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = 'http://3.110.33.106:4000/api'
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://3.109.48.78:4000/api').replace(/\/$/, '')
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -9,12 +9,25 @@ const api = axios.create({
   }
 })
 
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// 🔐 Attach JWT token automatically
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// ❌ Optional: Better error visibility
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API ERROR:', error.response || error)
+    return Promise.reject(error)
   }
-  return config
-})
+)
 
 export default api

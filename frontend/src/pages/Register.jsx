@@ -56,18 +56,29 @@ export default function Register() {
               onChange={e => setForm({ ...form, password: e.target.value })} required />
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-300">Role</label>
+              <span className="block text-sm font-medium text-slate-300">Role</span>
               <div className="grid grid-cols-2 gap-2">
                 {['STUDENT', 'TEACHER'].map(r => (
-                  <button key={r} type="button"
-                    onClick={() => setForm({ ...form, role: r })}
-                    className={`py-2.5 rounded-lg text-sm font-medium border transition-all ${
+                  <label
+                    key={r}
+                    htmlFor={`role-${r}`}
+                    className={`py-2.5 rounded-lg text-sm font-medium border transition-all cursor-pointer text-center ${
                       form.role === r
                         ? 'bg-brand-600/20 border-brand-500 text-brand-300'
                         : 'bg-dark-700 border-dark-400 text-slate-400 hover:border-dark-300'
-                    }`}>
+                    }`}
+                  >
+                    <input
+                      id={`role-${r}`}
+                      type="radio"
+                      name="role"
+                      value={r}
+                      checked={form.role === r}
+                      onChange={() => setForm({ ...form, role: r })}
+                      className="sr-only"
+                    />
                     {r.charAt(0) + r.slice(1).toLowerCase()}
-                  </button>
+                  </label>
                 ))}
               </div>
             </div>
