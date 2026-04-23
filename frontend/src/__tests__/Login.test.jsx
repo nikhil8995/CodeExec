@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import Login from '../../pages/Login'
+import Login from '../pages/Login'
 
 // Mock the navigate function
 const mockNavigate = vi.fn()
@@ -15,7 +15,7 @@ vi.mock('react-router-dom', async () => {
 
 // Mock AuthContext
 const mockLogin = vi.fn()
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     login: mockLogin,
   }),

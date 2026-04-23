@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  db:
+  codeexec-postgres:
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
@@ -10,5 +10,36 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - codeexec-network
+
+  codeexec-backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@codeexec-postgres:5432/codeexec
+      JWT_SECRET: supersecret
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - codeexec-postgres
+    networks:
+      - codeexec-network
+
+  codeexec-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    networks:
+      - codeexec-network
+
 volumes:
   pgdata:
+
+networks:
+  codeexec-network:
+    driver: bridge

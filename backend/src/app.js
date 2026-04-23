@@ -1,7 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const promBundle = require('express-prom-bundle');
 
 const app = express();
+
+const metricsMiddleware = promBundle({
+  includeMethod: true, 
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: { project_name: 'codeexec' },
+  promClient: {
+    collectDefaultMetrics: {}
+  }
+});
+
+// must be first middleware to catch response times
+app.use(metricsMiddleware);
 
 const allowedOrigins = [
   'http://localhost:5173',
