@@ -5,15 +5,17 @@ pipeline {
         SONAR_TOKEN = credentials('sonar-token')
     }
 
+    stages {
+
         stage('SonarQube Analysis') {
-        steps {
-            sh '''
-            sonar-scanner \
-            -Dsonar.projectKey=codeexec \
-            -Dsonar.sources=backend,frontend \
-            -Dsonar.host.url=http://sonarqube:9000 \
-            -Dsonar.token=${SONAR_TOKEN}
-            '''
+            steps {
+                sh '''
+                sonar-scanner \
+                -Dsonar.projectKey=codeexec \
+                -Dsonar.sources=backend,frontend \
+                -Dsonar.host.url=http://sonarqube:9000 \
+                -Dsonar.token=${SONAR_TOKEN}
+                '''
             }
         }
 
@@ -25,11 +27,11 @@ pipeline {
                 ]) {
                     sh '''
                     export AWS_DEFAULT_REGION=ap-south-1
-
                     ansible-playbook ansible/deploy.yml
                     '''
                 }
             }
         }
+
     }
 }
