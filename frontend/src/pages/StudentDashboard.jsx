@@ -40,9 +40,9 @@ export default function StudentDashboard() {
     )
   } else {
     recentSubmissionsContent = (
-      <div className="space-y-2">
+      <div className="space-y-3">
         {recentSubmissions.map((sub) => (
-          <Link key={sub.id} to={`/submissions?submissionId=${sub.id}`}>
+          <Link key={sub.id} to={`/submissions?submissionId=${sub.id}`} className="block">
             <div className="rounded-xl border border-dark-500 bg-dark-900/40 px-3 py-3 hover:border-cyan-500/40 hover:bg-dark-800/60 transition-all">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -118,11 +118,6 @@ export default function StudentDashboard() {
             )}
           </div>
         </Card>
-      </div>
-
-      <div className="rounded-2xl border border-dark-500 bg-dark-900/45 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <p className="text-xs font-mono text-slate-500">Tip: Click any submission to inspect full case-by-case outputs.</p>
-        <Link to="/submissions" className="text-xs font-mono uppercase tracking-wide text-cyan-300 hover:text-cyan-200">Go to Submission Inspector</Link>
       </div>
     </div>
   )
