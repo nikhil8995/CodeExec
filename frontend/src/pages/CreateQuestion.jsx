@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Input from '../components/ui/Input'
 import Textarea from '../components/ui/Textarea'
 import Button from '../components/ui/Button'
+import { handleTextareaCodeEditorKeyDown } from '../utils/codeEditorKeys'
 
 const EXAMPLE_MULTI = `[
   { "input": "2 3", "output": "5" },
@@ -48,6 +49,22 @@ export default function CreateQuestion() {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
+  const updateStarterCode = (nextValue) => {
+    setForm((prev) => ({ ...prev, starterCode: nextValue }))
+  }
+
+  const updateExpectedOutput = (nextValue) => {
+    setForm((prev) => ({ ...prev, expectedOutput: nextValue }))
+  }
+
+  const handleStarterCodeKeyDown = (event) => {
+    handleTextareaCodeEditorKeyDown(event, updateStarterCode)
+  }
+
+  const handleExpectedOutputKeyDown = (event) => {
+    handleTextareaCodeEditorKeyDown(event, updateExpectedOutput)
+  }
+
   const toggleMulti = () => {
     setMultiMode(m => {
       if (!m) setForm(f => ({ ...f, expectedOutput: EXAMPLE_MULTI }))
@@ -83,6 +100,7 @@ export default function CreateQuestion() {
               placeholder={"// e.g.\nfunction solution(a, b) {\n  // your code\n}"}
               value={form.starterCode}
               onChange={set('starterCode')}
+              onKeyDown={handleStarterCodeKeyDown}
               spellCheck={false}
             />
           </div>
@@ -101,6 +119,7 @@ export default function CreateQuestion() {
               placeholder={multiMode ? EXAMPLE_MULTI : 'e.g. 42'}
               value={form.expectedOutput}
               onChange={set('expectedOutput')}
+              onKeyDown={handleExpectedOutputKeyDown}
               spellCheck={false}
               required
             />

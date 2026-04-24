@@ -4,6 +4,7 @@ import api from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import { handleTextareaCodeEditorKeyDown } from '../utils/codeEditorKeys'
 
 function useCountdown(seconds, onExpire) {
   const [timeLeft, setTimeLeft] = useState(seconds)
@@ -110,6 +111,11 @@ export default function QuestionDetail() {
   // caseResults[i] = { pass, actual, codeSnapshot, ran }
   // Once pass=true it never goes back to false (locked)
   const [caseResults, setCaseResults] = useState({})
+
+  const handleCodeEditorKeyDown = useCallback((event) => {
+    if (event.target.readOnly) return
+    handleTextareaCodeEditorKeyDown(event, setCode)
+  }, [])
 
   useEffect(() => {
     api.get(`/questions/${id}`).then(r => {
@@ -386,6 +392,7 @@ export default function QuestionDetail() {
             className={`code-editor min-h-[460px] ${editorLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
             value={code}
             onChange={e => !editorLocked && setCode(e.target.value)}
+            onKeyDown={handleCodeEditorKeyDown}
             spellCheck={false}
             placeholder="// Write your solution here..."
             readOnly={editorLocked}
