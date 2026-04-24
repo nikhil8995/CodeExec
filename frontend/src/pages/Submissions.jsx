@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -37,10 +37,10 @@ function parseSubmissionOutput(submission) {
 }
 
 export default function Submissions() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
     api.get('/submissions/mine').then(r => setSubmissions(r.data)).finally(() => setLoading(false))
@@ -48,15 +48,36 @@ export default function Submissions() {
 
   useEffect(() => {
     const submissionId = Number(searchParams.get('submissionId'))
-    if (!submissionId || submissions.length === 0) return
-    const exists = submissions.some((sub) => sub.id === submissionId)
-    if (exists) setExpanded(submissionId)
+    if (submissions.length === 0) {
+      setSelectedId(null)
+      return
+    }
+
+    if (submissionId) {
+      const exists = submissions.some((sub) => sub.id === submissionId)
+      if (exists) {
+        setSelectedId(submissionId)
+        return
+      }
+    }
+
+    setSelectedId(submissions[0].id)
   }, [searchParams, submissions])
 
   const submissionsWithDetails = useMemo(
     () => submissions.map((sub) => ({ ...sub, details: parseSubmissionOutput(sub) })),
     [submissions]
   )
+
+  const selectedSubmission = useMemo(
+    () => submissionsWithDetails.find((sub) => sub.id === selectedId) || null,
+    [submissionsWithDetails, selectedId]
+  )
+
+  const handleSelectSubmission = (id) => {
+    setSelectedId(id)
+    setSearchParams({ submissionId: String(id) })
+  }
 
   let content
   if (loading) {
@@ -65,68 +86,96 @@ export default function Submissions() {
     content = (
       <Card className="text-center py-12">
         <p className="text-slate-500">No submissions yet. Solve some problems!</p>
+        <Link to="/questions" className="mt-2 text-cyan-300 hover:text-cyan-200 text-sm inline-block">Open problems</Link>
       </Card>
     )
   } else {
     content = (
-      <div className="space-y-3 stagger-fade">
-        {submissionsWithDetails.map(sub => (
-          <Card key={sub.id} className={`cursor-pointer transition-all ${expanded === sub.id ? 'border-dark-400' : ''}`}
-            onClick={() => setExpanded(expanded === sub.id ? null : sub.id)}>
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-100 truncate">{sub.question?.title}</p>
-                <p className="text-xs text-slate-600 font-mono mt-0.5">{new Date(sub.createdAt).toLocaleString()}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge label={sub.status} />
-                <span className="text-slate-600 text-xs">{expanded === sub.id ? '▲' : '▼'}</span>
-              </div>
-            </div>
-
-            {expanded === sub.id && (
-              <div className="mt-4 pt-4 border-t border-dark-500 space-y-3">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Submitted Code</p>
-                  <pre className="text-xs font-mono bg-dark-900 rounded-xl p-3 text-slate-300 overflow-auto max-h-48 border border-dark-500">{sub.details.code}</pre>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Summary Output</p>
-                  <pre className={`text-xs font-mono bg-dark-900 rounded-xl p-3 overflow-auto border border-dark-500 ${sub.status === 'PASS' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {sub.details.summary || '(empty)'}
-                  </pre>
-                </div>
-
-                {sub.details.cases.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">All Case Results</p>
-                    {sub.details.cases.map((testCase) => (
-                      <div
-                        key={`${sub.id}-${testCase.case}`}
-                        className={`rounded-xl border px-3 py-2 text-xs font-mono ${testCase.pass ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'}`}
-                      >
-                        <p>{testCase.pass ? '✓' : '✗'} Case {testCase.case}{testCase.input ? ` · in: ${testCase.input}` : ''}</p>
-                        <p className="mt-1">got: {testCase.actual || '(empty)'} · want: {testCase.expected || '(empty)'}</p>
-                      </div>
-                    ))}
+      <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-display font-semibold text-slate-200">Submission History</h2>
+            <span className="text-xs font-mono text-slate-500">{submissionsWithDetails.length} total</span>
+          </div>
+          <div className="space-y-2 max-h-[70vh] overflow-auto pr-1">
+            {submissionsWithDetails.map((sub) => {
+              const active = sub.id === selectedId
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => handleSelectSubmission(sub.id)}
+                  className={`w-full text-left rounded-xl border px-3 py-3 transition-all ${active ? 'border-cyan-500/40 bg-cyan-900/10' : 'border-dark-500 bg-dark-900/35 hover:border-dark-400 hover:bg-dark-800/55'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-100 truncate">{sub.question?.title || 'Untitled question'}</p>
+                    <Badge label={sub.status} />
                   </div>
-                )}
+                  <p className="text-xs text-slate-500 font-mono mt-1">{new Date(sub.createdAt).toLocaleString()}</p>
+                </button>
+              )
+            })}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          {selectedSubmission ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/80 font-mono">Submission Inspector</p>
+                  <h3 className="text-xl font-display font-bold text-white mt-1">{selectedSubmission.question?.title || 'Untitled question'}</h3>
+                  <p className="text-xs text-slate-500 font-mono mt-1">{new Date(selectedSubmission.createdAt).toLocaleString()}</p>
+                </div>
+                <Badge label={selectedSubmission.status} />
               </div>
-            )}
-          </Card>
-        ))}
+
+              <div>
+                <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Submitted Code</p>
+                <pre className="text-xs font-mono bg-dark-900 rounded-xl p-3 text-slate-300 overflow-auto max-h-56 border border-dark-500">{selectedSubmission.details.code}</pre>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Summary Output</p>
+                <pre className={`text-xs font-mono bg-dark-900 rounded-xl p-3 overflow-auto border border-dark-500 ${selectedSubmission.status === 'PASS' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {selectedSubmission.details.summary || '(empty)'}
+                </pre>
+              </div>
+
+              {selectedSubmission.details.cases.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 mb-1.5 uppercase tracking-wide">All Case Results</p>
+                  {selectedSubmission.details.cases.map((testCase) => (
+                    <div
+                      key={`${selectedSubmission.id}-${testCase.case}`}
+                      className={`rounded-xl border px-3 py-2 text-xs font-mono ${testCase.pass ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'}`}
+                    >
+                      <p>{testCase.pass ? 'PASS' : 'FAIL'} Case {testCase.case}{testCase.input ? ` | in: ${testCase.input}` : ''}</p>
+                      <p className="mt-1">got: {testCase.actual || '(empty)'}</p>
+                      <p className="mt-1">want: {testCase.expected || '(empty)'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm">Select a submission from the left panel to inspect details.</p>
+          )}
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn">
-      <Card className="relative overflow-hidden p-6">
-        <div className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl"></div>
+    <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
+      <Card className="relative overflow-hidden p-6 sm:p-7 border-cyan-500/20 bg-gradient-to-br from-dark-800/80 to-dark-900/70">
+        <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"></div>
+        <div className="pointer-events-none absolute -bottom-24 -left-8 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl"></div>
+        <div className="pointer-events-none absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(to right, rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)', backgroundSize: '22px 22px' }}></div>
         <div className="relative">
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80 font-mono">Activity Log</p>
-          <h1 className="text-3xl font-display font-bold text-white mt-1.5">My Submissions</h1>
-          <p className="text-slate-400 text-sm mt-1">{submissions.length} submissions total</p>
+          <h1 className="text-3xl font-display font-bold text-white mt-1.5">Submission Inspector</h1>
+          <p className="text-slate-300 text-sm mt-1">Open any submission and review full output on every case.</p>
         </div>
       </Card>
 

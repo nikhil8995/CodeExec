@@ -22,31 +22,36 @@ export default function StudentDashboard() {
   }, [])
 
   const passed = submissions.filter(s => s.status === 'PASS').length
-  const attempted = new Set(submissions.map(s => s.questionId)).size
+  const attempted = submissions.length
   const score = attempted > 0 ? Math.round((passed / attempted) * 100) : 0
+
+  const recentSubmissions = submissions.slice(0, 6)
+  const recommendedQuestions = questions.slice(0, 6)
 
   let recentSubmissionsContent
   if (loading) {
-    recentSubmissionsContent = <div className="text-center py-8 text-slate-500">Loading...</div>
-  } else if (submissions.length === 0) {
+    recentSubmissionsContent = <div className="text-center py-10 text-slate-500">Loading...</div>
+  } else if (recentSubmissions.length === 0) {
     recentSubmissionsContent = (
-      <Card className="text-center py-8">
+      <div className="text-center py-10">
         <p className="text-slate-500 text-sm">No submissions yet.</p>
-        <Link to="/questions" className="mt-2 text-brand-400 text-sm inline-block">Browse problems →</Link>
-      </Card>
+        <Link to="/questions" className="mt-2 text-cyan-300 text-sm inline-block hover:text-cyan-200">Solve your first problem</Link>
+      </div>
     )
   } else {
     recentSubmissionsContent = (
-      <div className="space-y-2.5 stagger-fade">
-        {submissions.slice(0, 5).map(sub => (
+      <div className="space-y-2">
+        {recentSubmissions.map((sub) => (
           <Link key={sub.id} to={`/submissions?submissionId=${sub.id}`}>
-            <Card hover className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-200">{sub.question?.title}</p>
-                <p className="text-xs text-slate-600 font-mono mt-0.5">{new Date(sub.createdAt).toLocaleString()}</p>
+            <div className="rounded-xl border border-dark-500 bg-dark-900/40 px-3 py-3 hover:border-cyan-500/40 hover:bg-dark-800/60 transition-all">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-100 truncate">{sub.question?.title || 'Untitled question'}</p>
+                  <p className="text-xs text-slate-500 font-mono mt-1">{new Date(sub.createdAt).toLocaleString()}</p>
+                </div>
+                <Badge label={sub.status} />
               </div>
-              <Badge label={sub.status} />
-            </Card>
+            </div>
           </Link>
         ))}
       </div>
@@ -55,59 +60,69 @@ export default function StudentDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
-      <Card className="relative overflow-hidden p-6 sm:p-7">
-        <div className="pointer-events-none absolute -top-14 right-0 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl"></div>
-        <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl"></div>
-        <div className="relative flex flex-col gap-2">
-          <p className="text-xs uppercase tracking-[0.2em] text-emerald-300/80 font-mono">Student Arena</p>
-          <h1 className="text-3xl sm:text-4xl font-display font-bold text-white">Keep coding, {user?.name}!</h1>
-          <p className="text-sm text-slate-400 max-w-2xl">Solve problems daily, improve consistency, and track your performance in real time.</p>
+      <Card className="relative overflow-hidden p-6 sm:p-8 border-cyan-500/20 bg-gradient-to-br from-dark-800/80 to-dark-900/70">
+        <div className="pointer-events-none absolute -top-20 -right-16 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"></div>
+        <div className="pointer-events-none absolute -bottom-20 -left-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl"></div>
+        <div className="pointer-events-none absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(to right, rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+        <div className="relative flex flex-col gap-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80 font-mono">Student Command Center</p>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-white">Welcome back, {user?.name}</h1>
+          <p className="text-sm text-slate-300 max-w-2xl">Track every run, inspect every submission, and keep your momentum with a focused workflow.</p>
         </div>
       </Card>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Attempted', value: attempted, color: 'text-brand-300' },
-          { label: 'Passed', value: passed, color: 'text-emerald-300' },
-          { label: 'Success Rate', value: `${score}%`, color: 'text-cyan-300' },
-          { label: 'Total Problems', value: questions.length, color: 'text-violet-300' },
+          { label: 'Attempts', value: attempted, color: 'text-cyan-300', tone: 'from-cyan-500/20 to-cyan-900/10' },
+          { label: 'Passed', value: passed, color: 'text-emerald-300', tone: 'from-emerald-500/20 to-emerald-900/10' },
+          { label: 'Success Rate', value: `${score}%`, color: 'text-yellow-300', tone: 'from-yellow-500/20 to-yellow-900/10' },
+          { label: 'Problems', value: questions.length, color: 'text-brand-300', tone: 'from-brand-500/20 to-brand-900/10' },
         ].map(stat => (
-          <Card key={stat.label}>
+          <Card key={stat.label} className={`bg-gradient-to-br ${stat.tone}`}>
             <p className="text-slate-500 text-[11px] font-medium uppercase tracking-[0.18em]">{stat.label}</p>
             <p className={`text-3xl font-display font-bold mt-2 ${stat.color}`}>{stat.value}</p>
           </Card>
         ))}
       </div>
 
-      {/* Recent */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-display font-semibold text-slate-200">Recent Submissions</h2>
-          <Link to="/submissions" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">View all →</Link>
-        </div>
-        {recentSubmissionsContent}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-display font-semibold text-slate-200">Recent Submissions</h2>
+            <Link to="/submissions" className="text-sm text-cyan-300 hover:text-cyan-200 transition-colors">Open submissions</Link>
+          </div>
+
+          {recentSubmissionsContent}
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-display font-semibold text-slate-200">Recommended Problems</h2>
+            <Link to="/questions" className="text-sm text-brand-300 hover:text-brand-200 transition-colors">Browse all</Link>
+          </div>
+
+          <div className="space-y-2">
+            {recommendedQuestions.map((q) => (
+              <Link key={q.id} to={`/questions/${q.id}`}>
+                <div className="rounded-xl border border-dark-500 bg-dark-900/40 px-3 py-3 hover:border-brand-500/40 hover:bg-dark-800/60 transition-all">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-slate-100 font-medium leading-snug">{q.title}</p>
+                    <Badge label={q.difficulty} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2 line-clamp-2">{q.description}</p>
+                </div>
+              </Link>
+            ))}
+            {!loading && recommendedQuestions.length === 0 && (
+              <p className="text-sm text-slate-500">No problems available right now.</p>
+            )}
+          </div>
+        </Card>
       </div>
 
-      {/* Quick access */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-display font-semibold text-slate-200">Available Problems</h2>
-          <Link to="/questions" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">View all →</Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 stagger-fade">
-          {questions.slice(0, 4).map(q => (
-            <Link key={q.id} to={`/questions/${q.id}`}>
-              <Card hover className="h-full">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-medium text-slate-100 text-sm leading-snug">{q.title}</h3>
-                  <Badge label={q.difficulty} />
-                </div>
-                <p className="text-xs text-slate-400 mt-2 line-clamp-2">{q.description}</p>
-              </Card>
-            </Link>
-          ))}
-        </div>
+      <div className="rounded-2xl border border-dark-500 bg-dark-900/45 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="text-xs font-mono text-slate-500">Tip: Click any submission to inspect full case-by-case outputs.</p>
+        <Link to="/submissions" className="text-xs font-mono uppercase tracking-wide text-cyan-300 hover:text-cyan-200">Go to Submission Inspector</Link>
       </div>
     </div>
   )
