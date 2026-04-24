@@ -8,7 +8,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
-  'http://3.109.48.78:5173' // 🔥 ADD THIS
+  'http://3.6.88.58:5173' // 🔥 ADD THIS
 ];
 
 app.use(cors({
