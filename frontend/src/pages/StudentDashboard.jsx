@@ -25,6 +25,34 @@ export default function StudentDashboard() {
   const attempted = new Set(submissions.map(s => s.questionId)).size
   const score = attempted > 0 ? Math.round((passed / attempted) * 100) : 0
 
+  let recentSubmissionsContent
+  if (loading) {
+    recentSubmissionsContent = <div className="text-center py-8 text-slate-500">Loading...</div>
+  } else if (submissions.length === 0) {
+    recentSubmissionsContent = (
+      <Card className="text-center py-8">
+        <p className="text-slate-500 text-sm">No submissions yet.</p>
+        <Link to="/questions" className="mt-2 text-brand-400 text-sm inline-block">Browse problems →</Link>
+      </Card>
+    )
+  } else {
+    recentSubmissionsContent = (
+      <div className="space-y-2.5 stagger-fade">
+        {submissions.slice(0, 5).map(sub => (
+          <Link key={sub.id} to={`/submissions?submissionId=${sub.id}`}>
+            <Card hover className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-slate-200">{sub.question?.title}</p>
+                <p className="text-xs text-slate-600 font-mono mt-0.5">{new Date(sub.createdAt).toLocaleString()}</p>
+              </div>
+              <Badge label={sub.status} />
+            </Card>
+          </Link>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
       <Card className="relative overflow-hidden p-6 sm:p-7">
@@ -58,26 +86,7 @@ export default function StudentDashboard() {
           <h2 className="text-lg font-display font-semibold text-slate-200">Recent Submissions</h2>
           <Link to="/submissions" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">View all →</Link>
         </div>
-        {loading ? (
-          <div className="text-center py-8 text-slate-500">Loading...</div>
-        ) : submissions.length === 0 ? (
-          <Card className="text-center py-8">
-            <p className="text-slate-500 text-sm">No submissions yet.</p>
-            <Link to="/questions" className="mt-2 text-brand-400 text-sm inline-block">Browse problems →</Link>
-          </Card>
-        ) : (
-          <div className="space-y-2.5 stagger-fade">
-            {submissions.slice(0, 5).map(sub => (
-              <Card key={sub.id} className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-200">{sub.question?.title}</p>
-                  <p className="text-xs text-slate-600 font-mono mt-0.5">{new Date(sub.createdAt).toLocaleString()}</p>
-                </div>
-                <Badge label={sub.status} />
-              </Card>
-            ))}
-          </div>
-        )}
+        {recentSubmissionsContent}
       </div>
 
       {/* Quick access */}
