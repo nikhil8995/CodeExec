@@ -36,15 +36,16 @@ export default function QuestionSubmissions() {
   }
 
   return (
-    <div className="flex h-full gap-0 -m-6 overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex h-full gap-0 -m-5 sm:-m-6 overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
 
       {/* LEFT PANEL */}
-      <div className="w-72 flex-shrink-0 flex flex-col bg-dark-800 border-r border-dark-500 overflow-hidden">
-        <div className="px-4 py-4 border-b border-dark-500 flex-shrink-0">
+      <div className="w-80 max-w-[45vw] flex-shrink-0 flex flex-col bg-dark-800/90 border-r border-dark-500 overflow-hidden backdrop-blur-sm">
+        <div className="px-4 py-4 border-b border-dark-500 flex-shrink-0 bg-dark-900/40">
           <button onClick={() => navigate('/my-questions')}
             className="min-h-8 px-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-all mb-3 inline-flex items-center gap-1">
             ← Back
           </button>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-brand-300/80 font-mono mb-1">Submission Review</p>
           <h2 className="font-display font-bold text-white text-sm leading-snug line-clamp-2">
             {question?.title || 'Loading...'}
           </h2>
@@ -74,7 +75,7 @@ export default function QuestionSubmissions() {
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="flex-1 overflow-y-auto bg-dark-900">
+      <div className="flex-1 overflow-y-auto bg-dark-900/40">
         {!selected ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="text-4xl mb-4 opacity-20">◈</div>
@@ -88,10 +89,10 @@ export default function QuestionSubmissions() {
             <div className="p-6 max-w-4xl mx-auto space-y-5 animate-fadeIn">
 
               {/* Student info */}
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4 rounded-2xl border border-dark-500/80 bg-dark-800/70 p-4">
                 <div>
                   <h3 className="text-lg font-display font-bold text-white">{selected.user?.name}</h3>
-                  <p className="text-sm text-slate-500 font-mono">{selected.user?.email}</p>
+                  <p className="text-sm text-slate-400 font-mono">{selected.user?.email}</p>
                   <p className="text-xs text-slate-600 font-mono mt-1">{new Date(selected.createdAt).toLocaleString()}</p>
                 </div>
                 <Badge label={selected.status} />

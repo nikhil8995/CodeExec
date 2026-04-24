@@ -57,15 +57,19 @@ export default function CreateQuestion() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold text-white">Create Question</h1>
-        <p className="text-slate-500 text-sm mt-1">Design a coding challenge for students</p>
-      </div>
+    <div className="max-w-3xl mx-auto animate-fadeIn space-y-6">
+      <Card className="relative overflow-hidden p-6">
+        <div className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl"></div>
+        <div className="relative">
+          <p className="text-xs uppercase tracking-[0.2em] text-brand-300/80 font-mono">Teacher Studio</p>
+          <h1 className="text-3xl font-display font-bold text-white mt-1.5">Create Question</h1>
+          <p className="text-slate-400 text-sm mt-1">Design a coding challenge for students with test cases and time limits.</p>
+        </div>
+      </Card>
 
       <Card>
         {error && (
-          <div className="bg-red-900/20 border border-red-700/40 rounded-lg px-4 py-3 text-red-400 text-sm mb-5">{error}</div>
+          <div className="bg-red-900/20 border border-red-700/40 rounded-xl px-4 py-3 text-red-300 text-sm mb-5">{error}</div>
         )}
         <form onSubmit={handleSubmit} className="space-y-5">
           <Input label="Title" placeholder="e.g. Sum of Two Numbers" value={form.title} onChange={set('title')} required />
@@ -143,8 +147,8 @@ export default function CreateQuestion() {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button type="submit" loading={loading} className="flex-1 justify-center">Create Question</Button>
+            <Button type="button" variant="secondary" size="lg" onClick={() => navigate(-1)}>Cancel</Button>
+            <Button type="submit" size="lg" loading={loading} className="flex-1 justify-center">Create Question</Button>
           </div>
         </form>
       </Card>

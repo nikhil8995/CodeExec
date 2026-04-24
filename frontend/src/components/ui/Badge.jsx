@@ -14,7 +14,7 @@ const variants = {
 export default function Badge({ label }) {
   const cls = variants[label] || 'bg-dark-500 text-slate-400 border-dark-400'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium border ${cls}`}>
+    <span className={`inline-flex items-center min-h-6 px-2.5 rounded-lg text-[11px] tracking-wide uppercase font-mono font-semibold border ${cls}`}>
       {label}
     </span>
   )
