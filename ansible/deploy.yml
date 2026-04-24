@@ -131,6 +131,19 @@
 
 
     # -------------------------
+    # FIX DOCKER STATE (CRITICAL)
+    # -------------------------
+    - name: Restart Docker to fix layer issues
+      shell: |
+        systemctl restart docker
+        sleep 5
+
+    - name: Clean builder cache
+      shell: |
+        docker builder prune -af || true
+
+
+    # -------------------------
     # NETWORK & VOLUME SETUP
     # -------------------------
     - name: Ensure network exists
@@ -182,8 +195,9 @@
     # -------------------------
     # BACKEND
     # -------------------------
-    - name: Build backend
-      command: docker build --no-cache -t codeexec-backend /home/ubuntu/CodeExec/backend
+    - name: Build backend (stable)
+      shell: |
+        DOCKER_BUILDKIT=1 docker build --no-cache -t codeexec-backend /home/ubuntu/CodeExec/backend
 
     - name: Run backend
       command: >
@@ -202,8 +216,8 @@
     # FRONTEND
     # -------------------------
     - name: Build frontend
-      command: >
-        docker build --no-cache
+      shell: >
+        DOCKER_BUILDKIT=1 docker build --no-cache
         --build-arg VITE_API_URL=http://{{ inventory_hostname }}:4000/api
         -t codeexec-frontend /home/ubuntu/CodeExec/frontend
 
