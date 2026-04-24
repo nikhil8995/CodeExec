@@ -88,7 +88,7 @@ export default function CreateQuestion() {
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-300">Expected Output</label>
               <button type="button" onClick={toggleMulti}
-                className={`text-xs font-mono px-2 py-1 rounded-md border transition-all ${multiMode ? 'bg-brand-600/20 border-brand-500 text-brand-300' : 'bg-dark-700 border-dark-500 text-slate-500 hover:border-dark-400'}`}>
+                className={`min-h-9 px-3 rounded-lg text-xs font-mono font-medium border transition-all ${multiMode ? 'bg-brand-600/20 border-brand-500 text-brand-300' : 'bg-dark-700 border-dark-500 text-slate-400 hover:border-dark-400 hover:text-slate-300'}`}>
                 {multiMode ? '✓ Multi-test JSON' : 'Switch to Multi-test'}
               </button>
             </div>
@@ -113,7 +113,7 @@ export default function CreateQuestion() {
             <div className="flex gap-2">
               {['EASY', 'MEDIUM', 'HARD'].map(d => (
                 <button key={d} type="button" onClick={() => setForm({ ...form, difficulty: d })}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  className={`flex-1 min-h-10 px-3 rounded-xl text-sm font-semibold border transition-all ${
                     form.difficulty === d
                       ? d === 'EASY' ? 'bg-emerald-900/30 border-emerald-600 text-emerald-300'
                         : d === 'HARD' ? 'bg-red-900/30 border-red-600 text-red-300'
@@ -134,7 +134,7 @@ export default function CreateQuestion() {
                 type="number" min="30" max="7200" step="30"
                 value={form.timeLimit}
                 onChange={e => setForm({ ...form, timeLimit: parseInt(e.target.value) || 300 })}
-                className="w-28 px-3 py-2.5 rounded-lg bg-dark-700 border border-dark-400 text-slate-200 text-sm outline-none focus:border-brand-500 transition-colors"
+                className="w-28 min-h-10 px-3 rounded-xl bg-dark-700 border border-dark-400 text-slate-200 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
               />
               <span className="text-xs text-slate-500">
                 = {Math.floor(form.timeLimit / 60)}m {form.timeLimit % 60 > 0 ? `${form.timeLimit % 60}s` : ''} — auto-submits when timer reaches 0

@@ -25,8 +25,8 @@ export default function QuestionsList() {
         <div className="flex gap-2">
           {['ALL', 'EASY', 'MEDIUM', 'HARD'].map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-all ${
-                filter === f ? 'bg-brand-600/20 border-brand-500 text-brand-300' : 'bg-dark-700 border-dark-500 text-slate-500 hover:border-dark-400'
+              className={`min-h-9 px-3.5 rounded-xl text-xs font-mono font-semibold border transition-all ${
+                filter === f ? 'bg-brand-600/20 border-brand-500 text-brand-300' : 'bg-dark-700 border-dark-500 text-slate-400 hover:border-dark-400 hover:text-slate-300'
               }`}>
               {f}
             </button>

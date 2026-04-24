@@ -24,11 +24,11 @@ export default function AppShell({ children }) {
   const handleLogout = () => { logout(); navigate('/login') }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-dark-900">
+    <div className="flex h-screen overflow-hidden bg-transparent">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-60' : 'w-16'} flex-shrink-0 flex flex-col bg-dark-800 border-r border-dark-500 transition-all duration-300`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} flex-shrink-0 flex flex-col bg-dark-800/95 border-r border-dark-500/90 backdrop-blur-md transition-all duration-300`}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-dark-500">
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-dark-500/90">
           <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold text-sm font-mono flex-shrink-0">
             CE
           </div>
@@ -65,7 +65,7 @@ export default function AppShell({ children }) {
         </nav>
 
         {/* User section */}
-        <div className="p-3 border-t border-dark-500">
+        <div className="p-3 border-t border-dark-500/90">
           {sidebarOpen ? (
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -75,10 +75,10 @@ export default function AppShell({ children }) {
                 <p className="text-sm font-medium text-slate-200 truncate">{user?.name}</p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
-              <button onClick={handleLogout} className="text-slate-500 hover:text-red-400 transition-colors text-xs" title="Logout">✕</button>
+              <button onClick={handleLogout} className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-red-300 hover:bg-red-900/20 transition-all" title="Logout">✕</button>
             </div>
           ) : (
-            <button onClick={handleLogout} className="w-full flex justify-center text-slate-500 hover:text-red-400 transition-colors" title="Logout">✕</button>
+            <button onClick={handleLogout} className="w-full min-h-10 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-red-300 hover:bg-red-900/20 transition-all" title="Logout">✕</button>
           )}
         </div>
       </aside>
@@ -86,8 +86,8 @@ export default function AppShell({ children }) {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="h-14 flex items-center justify-between px-6 border-b border-dark-500 bg-dark-800/50 backdrop-blur-sm flex-shrink-0">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-slate-200 transition-colors">
+        <header className="h-14 flex items-center justify-between px-6 border-b border-dark-500/90 bg-dark-800/60 backdrop-blur-sm flex-shrink-0">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-dark-600 transition-all">
             <div className="space-y-1">
               <span className="block w-5 h-0.5 bg-current"></span>
               <span className="block w-4 h-0.5 bg-current"></span>

@@ -242,7 +242,7 @@ export default function QuestionDetail() {
             <div className="flex items-center gap-2 mb-3">
               <Badge label={question.difficulty} />
               {question.timeLimit > 0 && (
-                <span className="text-xs font-mono text-slate-500 bg-dark-700 border border-dark-400 px-2 py-0.5 rounded-md">
+                <span className="inline-flex items-center min-h-7 text-xs font-mono text-slate-500 bg-dark-700 border border-dark-400 px-2.5 rounded-lg">
                   ⏱ {Math.floor(question.timeLimit / 60)}m{question.timeLimit % 60 > 0 ? ` ${question.timeLimit % 60}s` : ''}
                 </span>
               )}
@@ -270,10 +270,10 @@ export default function QuestionDetail() {
                 const pass = r?.pass
                 return (
                   <button key={i} onClick={() => setActiveCase(i)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-all flex items-center gap-1.5 ${
+                    className={`min-h-9 px-3.5 rounded-xl text-xs font-mono font-semibold border transition-all flex items-center gap-1.5 ${
                       activeCase === i
                         ? 'bg-dark-600 border-brand-500 text-slate-200'
-                        : 'bg-dark-700 border-dark-500 text-slate-500 hover:border-dark-400'
+                        : 'bg-dark-700 border-dark-500 text-slate-400 hover:border-dark-400 hover:text-slate-300'
                     }`}>
                     {ran && <span className={pass ? 'text-emerald-400' : 'text-red-400'}>{pass ? '✓' : '✗'}</span>}
                     Case {i + 1}
@@ -399,7 +399,8 @@ export default function QuestionDetail() {
 
           {!submitted && (
             <Button
-              className="w-full justify-center py-3"
+              size="lg"
+              className="w-full justify-center"
               onClick={() => setShowPreview(true)}
               disabled={submitting || !allCasesRan}
               loading={submitting}>
@@ -408,7 +409,7 @@ export default function QuestionDetail() {
           )}
 
           {submitted && (
-            <Button className="w-full justify-center py-3" disabled>
+            <Button size="lg" className="w-full justify-center" disabled>
               ✓ Submitted
             </Button>
           )}

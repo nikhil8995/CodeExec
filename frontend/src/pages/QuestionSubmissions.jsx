@@ -42,7 +42,7 @@ export default function QuestionSubmissions() {
       <div className="w-72 flex-shrink-0 flex flex-col bg-dark-800 border-r border-dark-500 overflow-hidden">
         <div className="px-4 py-4 border-b border-dark-500 flex-shrink-0">
           <button onClick={() => navigate('/my-questions')}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors mb-3 flex items-center gap-1">
+            className="min-h-8 px-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-all mb-3 inline-flex items-center gap-1">
             ← Back
           </button>
           <h2 className="font-display font-bold text-white text-sm leading-snug line-clamp-2">
@@ -60,7 +60,7 @@ export default function QuestionSubmissions() {
               const active = selected?.id === sub.id
               return (
                 <button key={sub.id} onClick={() => handleSelect(sub)}
-                  className={`w-full text-left px-4 py-3 border-b border-dark-600 transition-all ${active ? 'bg-dark-600 border-l-2 border-l-brand-500' : 'hover:bg-dark-700'}`}>
+                  className={`w-full text-left min-h-16 px-4 py-3 border-b border-dark-600 transition-all ${active ? 'bg-dark-600 border-l-2 border-l-brand-500' : 'hover:bg-dark-700'}`}>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-sm font-medium text-slate-200 truncate">{sub.user?.name}</span>
                     <Badge label={sub.status} />
@@ -104,10 +104,10 @@ export default function QuestionSubmissions() {
                   <div className="flex gap-2">
                     {cases.map((c, i) => (
                       <button key={i} onClick={() => setActiveTab(i)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-all flex items-center gap-1.5 ${
+                        className={`min-h-9 px-3.5 rounded-xl text-xs font-mono font-semibold border transition-all flex items-center gap-1.5 ${
                           activeTab === i
                             ? 'bg-dark-600 border-brand-500 text-slate-200'
-                            : 'bg-dark-800 border-dark-500 text-slate-500 hover:border-dark-400'
+                            : 'bg-dark-800 border-dark-500 text-slate-400 hover:border-dark-400 hover:text-slate-300'
                         }`}>
                         <span className={c.pass ? 'text-emerald-400' : 'text-red-400'}>{c.pass ? '✓' : '✗'}</span>
                         Case {c.case}
