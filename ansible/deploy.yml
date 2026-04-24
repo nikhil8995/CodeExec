@@ -115,19 +115,19 @@
 
 
     # -------------------------
-    # CLEAN OLD STATE (FIXED)
+    # CLEAN OLD STATE (SAFE)
     # -------------------------
     - name: Remove old containers
       shell: |
         docker rm -f codeexec-frontend codeexec-backend codeexec-postgres || true
 
-    - name: Remove unused Docker images (prevents disk bloat)
+    - name: Remove unused Docker images (safe)
       shell: |
-        docker image prune -af
+        docker image prune -af || true
 
     - name: Remove dangling volumes (safe)
       shell: |
-        docker volume prune -f
+        docker volume prune -f || true
 
 
     # -------------------------
@@ -213,13 +213,3 @@
         --network codeexec-network
         -p 5173:5173
         codeexec-frontend
-
-# Future you note
-
-#When you do add Jenkins on EC2:
-
-#docker run -d -p 8080:8080 -p 50000:50000 jenkins/jenkins:lts
-
-#And your webhook becomes:
-
-#http://EC2_IP:8080/github-webhook/
