@@ -1,7 +1,4 @@
 ---
-# =========================
-# 1. PROVISION / REUSE EC2
-# =========================
 - name: Provision or reuse EC2
   hosts: localhost
   connection: local
@@ -68,7 +65,7 @@
         name: "{{ ec2_ip }}"
         groups: codeexec
         ansible_user: ubuntu
-        ansible_ssh_private_key_file: /var/jenkins_home/.ssh/codeexec-key.pem
+        ansible_ssh_private_key_file: "{{ lookup('env', 'SSH_KEY_PATH') }}"
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
     - name: Wait for SSH
@@ -78,17 +75,18 @@
         delay: 15
         timeout: 180
 
-# =========================
-# 2. DEPLOY APP
-# =========================
 - name: Setup EC2 and deploy CodeExec
   hosts: codeexec
   become: true
 
+  vars:
+    image_tag: "{{ github_ref | default('latest') }}"
+    jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
+    postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+    postgres_user: "{{ lookup('env', 'POSTGRES_USER') | default('postgres') }}"
+    db_name: "{{ lookup('env', 'POSTGRES_DB') | default('codeexec') }}"
+
   tasks:
-    # -------------------------
-    # SYSTEM SETUP
-    # -------------------------
     - name: Update packages
       apt:
         update_cache: yes
@@ -112,9 +110,6 @@
         groups: docker
         append: true
 
-    # -------------------------
-    # CLEAN OLD STATE (IMPORTANT)
-    # -------------------------
     - name: Remove old containers
       shell: |
         docker rm -f codeexec-frontend codeexec-backend codeexec-postgres || true
@@ -129,9 +124,6 @@
         docker volume inspect postgres_data >/dev/null 2>&1 || \
         docker volume create postgres_data
 
-    # -------------------------
-    # CLONE CODE
-    # -------------------------
     - name: Remove old project
       file:
         path: /home/ubuntu/CodeExec
@@ -139,59 +131,103 @@
 
     - name: Clone project
       git:
-        repo: https://github.com/nikhil8995/CodeExec.git
+        repo: "{{ lookup('env', 'GITHUB_REPO') | default('https://github.com/nikhil8995/CodeExec.git') }}"
         dest: /home/ubuntu/CodeExec
-        version: main
+        version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
 
-    # -------------------------
-    # START DATABASE
-    # -------------------------
     - name: Run PostgreSQL
       command: >
         docker run -d --name codeexec-postgres
         --network codeexec-network
-        -e POSTGRES_USER=postgres
-        -e POSTGRES_PASSWORD=postgres
-        -e POSTGRES_DB=codeexec
+        -e POSTGRES_USER={{ postgres_user }}
+        -e POSTGRES_PASSWORD={{ postgres_password }}
+        -e POSTGRES_DB={{ db_name }}
         -v postgres_data:/var/lib/postgresql/data
-        -p 5432:5432 postgres:15
+        -p 5432:5432
+        --restart unless-stopped
+        postgres:15
 
     - name: Wait for Postgres
       shell: |
-        until docker exec codeexec-postgres pg_isready; do
+        until docker exec codeexec-postgres pg_isready -U {{ postgres_user }}; do
           sleep 2
         done
+      register: pg_ready
+      retries: 30
+      delay: 2
 
-    # -------------------------
-    # BACKEND
-    # -------------------------
-    - name: Build backend
-      command: docker build --no-cache -t codeexec-backend /home/ubuntu/CodeExec/backend
+    - name: Build backend with tag
+      command: docker build -t codeexec-backend:{{ image_tag }} /home/ubuntu/CodeExec/backend
+
+    - name: Tag backend as latest
+      command: docker tag codeexec-backend:{{ image_tag }} codeexec-backend:latest
 
     - name: Run backend
       command: >
         docker run -d --name codeexec-backend
         --network codeexec-network
         -p 4000:4000
-        -e DATABASE_URL=postgresql://postgres:postgres@codeexec-postgres:5432/codeexec
-        -e JWT_SECRET=supersecret
-        codeexec-backend
+        -e DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@codeexec-postgres:5432/{{ db_name }}
+        -e JWT_SECRET={{ jwt_secret }}
+        --restart unless-stopped
+        codeexec-backend:latest
+
+    - name: Wait for backend health
+      uri:
+        url: "http://localhost:4000/api/health"
+        method: GET
+        status_code: 200
+      register: backend_health
+      retries: 30
+      delay: 2
+      until: backend_health.status == 200
 
     - name: Run migrations
       command: docker exec codeexec-backend npx prisma migrate deploy
+      register: migration_result
+      failed_when: false
 
-    # -------------------------
-    # FRONTEND
-    # -------------------------
-    - name: Build frontend
+    - name: Build frontend with tag
       command: >
-        docker build --no-cache
+        docker build
         --build-arg VITE_API_URL=http://{{ inventory_hostname }}:4000/api
-        -t codeexec-frontend /home/ubuntu/CodeExec/frontend
+        -t codeexec-frontend:{{ image_tag }}
+        /home/ubuntu/CodeExec/frontend
+
+    - name: Tag frontend as latest
+      command: docker tag codeexec-frontend:{{ image_tag }} codeexec-frontend:latest
 
     - name: Run frontend
       command: >
         docker run -d --name codeexec-frontend
         --network codeexec-network
         -p 5173:5173
-        codeexec-frontend
+        --restart unless-stopped
+        codeexec-frontend:latest
+
+    - name: Wait for frontend health
+      wait_for:
+        port: 5173
+        delay: 5
+        timeout: 60
+
+- name: Post-deployment verification
+  hosts: codeexec
+  become: true
+
+  tasks:
+    - name: Verify backend is running
+      command: docker ps --filter "name=codeexec-backend" --format "{{.Names}}"
+      register: backend_status
+      failed_when: "'codeexec-backend' not in backend_status.stdout"
+
+    - name: Verify frontend is running
+      command: docker ps --filter "name=codeexec-frontend" --format "{{.Names}}"
+      register: frontend_status
+      failed_when: "'codeexec-frontend' not in frontend_status.stdout"
+
+    - name: Get deployment info
+      shell: |
+        echo "Backend: $(docker ps --filter 'name=codeexec-backend' --format '{{.Status}}')"
+        echo "Frontend: $(docker ps --filter 'name=codeexec-frontend' --format '{{.Status}}')"
+        echo "Postgres: $(docker ps --filter 'name=codeexec-postgres' --format '{{.Status}}')"

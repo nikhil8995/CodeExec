@@ -1,22 +1,31 @@
 const express = require('express');
 const cors = require('cors');
 const promBundle = require('express-prom-bundle');
+const { register } = require('./utils/metrics');
 
 const app = express();
 
 const metricsMiddleware = promBundle({
-  includeMethod: true, 
+  includeMethod: true,
   includePath: true,
   includeStatusCode: true,
-  includeUp: true,
-  customLabels: { project_name: 'codeexec' },
+  normalizePath: [
+    ['^/api/questions/.*', '/api/questions/#id'],
+    ['^/api/submissions/.*', '/api/submissions/#id']
+  ],
   promClient: {
-    collectDefaultMetrics: {}
+    collectDefaultMetrics: {},
+    register
   }
 });
-
-// must be first middleware to catch response times
 app.use(metricsMiddleware);
+
+app.use(metricsMiddleware);
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 const allowedOrigins = [
   'http://localhost:5173',

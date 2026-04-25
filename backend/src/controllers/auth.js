@@ -8,6 +8,8 @@ const sign = (user) => jwt.sign(
   { expiresIn: '7d' }
 );
 
+const { authCounter } = require('../utils/metrics');
+
 exports.register = async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -18,8 +20,10 @@ exports.register = async (req, res) => {
     const user = await prisma.user.create({
       data: { email, password: hashed, name, role: role === 'TEACHER' ? 'TEACHER' : 'STUDENT' }
     });
+    authCounter.inc({ type: 'register', status: 'success' });
     res.json({ token: sign(user), user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (e) {
+    authCounter.inc({ type: 'register', status: 'failure' });
     res.status(500).json({ error: e.message });
   }
 };
@@ -28,11 +32,19 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!user) {
+      authCounter.inc({ type: 'login', status: 'failure' });
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!match) {
+      authCounter.inc({ type: 'login', status: 'failure' });
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
+    authCounter.inc({ type: 'login', status: 'success' });
     res.json({ token: sign(user), user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (e) {
+    authCounter.inc({ type: 'login', status: 'failure' });
     res.status(500).json({ error: e.message });
   }
 };

@@ -8,7 +8,8 @@
     "test": "jest --coverage --forceExit --detectOpenHandles",
     "test:e2e": "jest --config jest.e2e.config.js --forceExit --detectOpenHandles",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init"
+    "prisma:migrate": "prisma migrate dev --name init",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

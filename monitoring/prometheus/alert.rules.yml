@@ -1,0 +1,119 @@
+groups:
+- name: codeexec_alerts
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+  - alert: HighLatency
+    expr: http_request_duration_seconds_sum / http_request_duration_seconds_count > 0.5
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High latency on {{ $labels.path }}"
+      description: "Average latency on {{ $labels.path }} is above 500ms for 2 minutes."
+
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High Error Rate (>10%)"
+      description: "Error rate (5xx) is above 10% on {{ $labels.instance }} for the last 5 minutes."
+
+  - alert: CodeExecutionTimeoutRate
+    expr: rate(codeexec_execution_timeouts_total[5m]) / rate(codeexec_submissions_total[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High code execution timeout rate"
+      description: "Code execution timeout rate is above 5% for the last 5 minutes."
+
+  - alert: HighExecutionLatency
+    expr: histogram_quantile(0.95, rate(codeexec_execution_duration_seconds_bucket[5m])) > 3
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High code execution latency"
+      description: "P95 execution duration is above 3 seconds."
+
+  - alert: HighActiveExecutions
+    expr: codeexec_active_executions > 80
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High number of active executions"
+      description: "Active executions approaching capacity limit (>80)."
+
+  - alert: DatabaseConnectionPoolExhausted
+    expr: rate(codeexec_execution_errors_total{error_type="db_connection"}[5m]) > 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection pool exhausted"
+      description: "Database connection errors detected."
+
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.15
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Node memory usage is above 85%."
+
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"}) < 0.2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low disk space on {{ $labels.instance }}"
+      description: "Disk usage is above 80%."
+
+  - alert: FrontendDown
+    expr: absent(up{job="frontend"}) == 1 or up{job="frontend"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Frontend is down"
+      description: "Frontend endpoint is not responding."
+
+  - alert: BackendDown
+    expr: absent(up{job="backend"}) == 1 or up{job="backend"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Backend is down"
+      description: "Backend endpoint is not responding."
+
+  - alert: HighExecutionErrorRate
+    expr: rate(codeexec_execution_errors_total[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High code execution error rate"
+      description: "Execution error rate is elevated."
+
+  - alert: SandboxSecurityEvents
+    expr: rate(codeexec_sandbox_security_events_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Sandbox security events detected"
+      description: "Permission denials or spawn failures detected in sandbox."

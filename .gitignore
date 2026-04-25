@@ -19,5 +19,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-implementation.md
-test.md
+AWS_DEPLOYMENT.md
+DEVOPS_GUIDE.md
+DEVOPS_IMPROVEMENT_PLAN.md
+USER_GUIDE.md
+LOCAL_TESTING.md

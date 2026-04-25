@@ -3,15 +3,37 @@
   hosts: localhost
   connection: local
 
+  vars:
+    ssh_path: "{{ lookup('env', 'SSH_KEY_PATH') | default('/var/jenkins_home/.ssh') }}"
+    network_name: "{{ lookup('env', 'DEVOPS_NETWORK') | default('devops-network') }}"
+
   tasks:
     - name: Check if devops network exists
-      command: docker network inspect devops-network
+      command: docker network inspect {{ network_name }}
       register: network_check
       ignore_errors: true
 
     - name: Create devops network if not exists
-      command: docker network create devops-network
+      command: docker network create {{ network_name }}
       when: network_check.rc != 0
+
+    - name: Ensure codeexec network exists
+      command: docker network inspect codeexec-network
+      register: codeexec_network_check
+      ignore_errors: true
+
+    - name: Create codeexec network if not exists
+      command: docker network create codeexec-network
+      when: codeexec_network_check.rc != 0
+
+    - name: Ensure monitoring network exists
+      command: docker network inspect monitoring-network
+      register: monitoring_network_check
+      ignore_errors: true
+
+    - name: Create monitoring network if not exists
+      command: docker network create monitoring-network
+      when: monitoring_network_check.rc != 0
 
     - name: Remove old SonarQube container if exists
       command: docker rm -f sonarqube
@@ -25,25 +47,66 @@
       command: >
         docker run -d
         --name sonarqube
-        --network devops-network
+        --network {{ network_name }}
         -p 9000:9000
         -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
         -v sonarqube_data:/opt/sonarqube/data
         -v sonarqube_extensions:/opt/sonarqube/extensions
         -v sonarqube_logs:/opt/sonarqube/logs
         --restart unless-stopped
-        sonarqube
+        sonarqube:10.7.0-community
+
+    - name: Wait for SonarQube
+      wait_for:
+        port: 9000
+        delay: 10
+        timeout: 300
+
+    - name: Run monitoring stack
+      command: >
+        docker run -d
+        --name prometheus
+        --network {{ network_name }}
+        -p 9090:9090
+        prom/prometheus:v2.48.0
+
+    - name: Run Grafana
+      command: >
+        docker run -d
+        --name grafana
+        --network {{ network_name }}
+        -p 3000:3000
+        -e GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+        --restart unless-stopped
+        grafana/grafana:10.2.3
+
+    - name: Build Jenkins image
+      command: docker build -t my-jenkins /home/jovaan05/projects/CodeExec/jenkins
+      ignore_errors: true
 
     - name: Run Jenkins
       command: >
         docker run -d
         --name jenkins
-        --network devops-network
+        --network {{ network_name }}
         -p 8080:8080
         -p 50000:50000
         -v /var/run/docker.sock:/var/run/docker.sock
         -v jenkins_home:/var/jenkins_home
-        -v /home/nikhil/.ssh:/var/jenkins_home/.ssh
+        -v {{ ssh_path }}:/var/jenkins_home/.ssh
         --group-add 960
         --restart unless-stopped
-        my-jenkins
+        my-jenkins:latest
+
+    - name: Verify containers are running
+      command: docker ps --format "{{.Names}}"
+      register: container_list
+
+    - name: Display setup complete
+      debug:
+        msg: |
+          DevOps tools setup complete!
+          - SonarQube: http://localhost:9000
+          - Jenkins: http://localhost:8080
+          - Prometheus: http://localhost:9090
+          - Grafana: http://localhost:3000
