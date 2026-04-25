@@ -1,0 +1,224 @@
+---
+- name: Provision or reuse CI/CD EC2
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    region: ap-south-1
+    instance_type: t3.medium
+    ami_id: ami-03f4878755434977f
+    key_name: codeexec-key
+    security_group_name: codeexec-cicd-sg
+
+  tasks:
+    - name: Check for existing CI/CD EC2
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "codeexec-cicd"
+          instance-state-name: ["running"]
+      register: ec2_info
+
+    - name: Create security group for CI/CD Server
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: CodeExec CI/CD Server SG
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [8080]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9100]
+            cidr_ip: 10.0.0.0/16
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+    - name: Launch CI/CD EC2 if not exists
+      amazon.aws.ec2_instance:
+        name: codeexec-cicd
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_groups: ["{{ security_group_name }}"]
+        network:
+          assign_public_ip: true
+        wait: true
+        state: running
+        tags:
+          Name: codeexec-cicd
+      when: ec2_info.instances | length == 0
+      register: ec2_new
+
+    - name: Set CI/CD EC2 IP
+      set_fact:
+        cicd_ec2_ip: >-
+          {{
+            (ec2_info.instances[0].public_ip_address
+            if ec2_info.instances | length > 0
+            else ec2_new.instances[0].public_ip_address)
+          }}
+
+    - name: Add CI/CD instance to inventory
+      add_host:
+        name: "{{ cicd_ec2_ip }}"
+        groups: cicd_server
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "{{ lookup('env', 'SSH_KEY_PATH') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Wait for SSH
+      wait_for:
+        host: "{{ cicd_ec2_ip }}"
+        port: 22
+        delay: 15
+        timeout: 180
+
+    - name: Store CI/CD IP for other playbooks
+      set_fact:
+        cicd_server_ip: "{{ cicd_ec2_ip }}"
+
+- name: Setup CI/CD Server
+  hosts: cicd_server
+  become: true
+
+  vars:
+    jenkins_url: "http://{{ inventory_hostname }}:8080"
+    sonarqube_url: "http://{{ inventory_hostname }}:9000"
+
+  tasks:
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install Docker & Git & Docker Compose
+      apt:
+        name:
+          - docker.io
+          - git
+          - docker-compose
+          - curl
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ubuntu to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
+
+    - name: Remove old containers
+      shell: |
+        docker rm -f jenkins sonarqube node-exporter || true
+
+    - name: Ensure network exists
+      shell: |
+        docker network inspect cicd-network >/dev/null 2>&1 || \
+        docker network create cicd-network
+
+    - name: Remove old project
+      file:
+        path: /home/ubuntu/CodeExec
+        state: absent
+
+    - name: Clone project
+      git:
+        repo: "{{ lookup('env', 'GITHUB_REPO') | default('https://github.com/nikhil8995/CodeExec.git') }}"
+        dest: /home/ubuntu/CodeExec
+        version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
+
+    - name: Create SonarQube volume
+      shell: |
+        docker volume inspect sonarqube-data >/dev/null 2>&1 || \
+        docker volume create sonarqube-data
+
+    - name: Run SonarQube
+      command: >
+        docker run -d --name sonarqube
+        --network cicd-network
+        -p 9000:9000
+        -v sonarqube-data:/opt/sonarqube/data
+        -e SONAR_ES_JAVA_OPTS=-Xmx512m
+        -e SONARQUBE_JDBC_URL=postgresql://sonarqube:5432/sonarqube
+        --restart unless-stopped
+        sonarqube:community
+      ignore_errors: true
+
+    - name: Wait for SonarQube to start
+      wait_for:
+        port: 9000
+        delay: 30
+        timeout: 300
+
+    - name: Run Jenkins
+      command: >
+        docker run -d --name jenkins
+        --network cicd-network
+        -p 8080:8080
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v jenkins-home:/var/jenkins_home
+        -e DOCKER_HOST=unix:///var/run/docker.sock
+        --restart unless-stopped
+        jenkins/jenkins:lts
+      ignore_errors: true
+
+    - name: Wait for Jenkins to start
+      wait_for:
+        port: 8080
+        delay: 15
+        timeout: 180
+
+    - name: Run Node Exporter
+      command: >
+        docker run -d --name node-exporter
+        --network cicd-network
+        -p 9100:9100
+        --restart unless-stopped
+        prom/node-exporter:latest
+      ignore_errors: true
+
+- name: Post-deployment verification for CI/CD Server
+  hosts: cicd_server
+  become: true
+
+  tasks:
+    - name: Verify jenkins is running
+      command: docker ps --filter name=jenkins --format "{{.Names}}"
+      register: jenkins_status
+      failed_when: "'jenkins' not in jenkins_status.stdout"
+
+    - name: Verify sonarqube is running
+      command: docker ps --filter name=sonarqube --format "{{.Names}}"
+      register: sonarqube_status
+      failed_when: "'sonarqube' not in sonarqube_status.stdout"
+
+    - name: Verify node-exporter is running
+      command: docker ps --filter name=node-exporter --format "{{.Names}}"
+      register: node_exporter_status
+      failed_when: "'node-exporter' not in node_exporter_status.stdout"
+
+    - name: Get deployment info
+      shell: |
+        echo "=== CI/CD Server Deployment Status ==="
+        docker ps --filter name=jenkins
+        docker ps --filter name=sonarqube
+        docker ps --filter name=node-exporter
+        echo ""
+        echo "Jenkins URL: http://{{ inventory_hostname }}:8080"
+        echo "SonarQube URL: http://{{ inventory_hostname }}:9000"
+        echo "Node Exporter: http://{{ inventory_hostname }}:9100"

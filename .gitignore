@@ -26,3 +26,26 @@ USER_GUIDE.md
 LOCAL_TESTING.md
 implementation.md
 test.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+ansible-env/
+.venv/
+
+# AWS
+*.pem
+.aws/
+awscliv2.zip
+install
+THIRD_PARTY_LICENSES
+aws
+
+# Logs
+*.log
+*.tmp
+
+# Terraform
+*.tfstate
+.terraform/
