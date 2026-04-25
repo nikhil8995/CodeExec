@@ -244,16 +244,9 @@
       register: postgres_status
       failed_when: postgres_status.stdout_lines | length <= 1
 
-    - name: Verify node-exporter is running
-      command: docker ps --filter name=node-exporter
-      register: node_exporter_status
-      failed_when: node_exporter_status.stdout_lines | length <= 1
-      changed_when: false
-
     - name: Get deployment info
       shell: |
         echo "=== Deployment Status ==="
         docker ps --filter name=codeexec-backend
         docker ps --filter name=codeexec-frontend
         docker ps --filter name=codeexec-postgres
-        docker ps --filter name=node-exporter

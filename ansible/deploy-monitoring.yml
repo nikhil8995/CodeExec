@@ -140,13 +140,6 @@
         dest: /home/ubuntu/CodeExec
         version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
 
-    - name: Create prometheus config with external scrape targets
-      template:
-        src: /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml
-        dest: /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml
-      vars:
-        node_exporter_ip: "{{ app_server_ip }}"
-
     - name: Run Prometheus
       command: >
         docker run -d --name prometheus
@@ -194,22 +187,29 @@
 
   tasks:
     - name: Verify prometheus is running
-      command: docker ps --filter "name=prometheus" --format "{{.Names}}"
+      command: docker ps --filter name=prometheus
       register: prometheus_status
-      failed_when: "'prometheus' not in prometheus_status.stdout"
+      failed_when: prometheus_status.stdout_lines | length <= 1
 
     - name: Verify grafana is running
-      command: docker ps --filter "name=grafana" --format "{{.Names}}"
+      command: docker ps --filter name=grafana
       register: grafana_status
-      failed_when: "'grafana' not in grafana_status.stdout"
+      failed_when: grafana_status.stdout_lines | length <= 1
 
     - name: Verify alertmanager is running
-      command: docker ps --filter "name=alertmanager" --format "{{.Names}}"
+      command: docker ps --filter name=alertmanager
       register: alertmanager_status
-      failed_when: "'alertmanager' not in alertmanager_status.stdout"
+      failed_when: alertmanager_status.stdout_lines | length <= 1
 
     - name: Get deployment info
       shell: |
-        echo "Prometheus: $(docker ps --filter 'name=prometheus' --format '{{.Status}}')"
-        echo "Grafana: $(docker ps --filter 'name=grafana' --format '{{.Status}}')"
-        echo "Alertmanager: $(docker ps --filter 'name=alertmanager' --format '{{.Status}}')"
+        echo "=== Monitoring Stack Status ==="
+        echo ""
+        echo "[Prometheus]"
+        docker ps --filter name=prometheus
+        echo ""
+        echo "[Grafana]"
+        docker ps --filter name=grafana
+        echo ""
+        echo "[Alertmanager]"
+        docker ps --filter name=alertmanager

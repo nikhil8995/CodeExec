@@ -198,25 +198,31 @@
 
   tasks:
     - name: Verify jenkins is running
-      command: docker ps --filter name=jenkins --format "{{.Names}}"
+      command: docker ps --filter name=jenkins
       register: jenkins_status
-      failed_when: "'jenkins' not in jenkins_status.stdout"
+      failed_when: jenkins_status.stdout_lines | length <= 1
 
     - name: Verify sonarqube is running
-      command: docker ps --filter name=sonarqube --format "{{.Names}}"
+      command: docker ps --filter name=sonarqube
       register: sonarqube_status
-      failed_when: "'sonarqube' not in sonarqube_status.stdout"
+      failed_when: sonarqube_status.stdout_lines | length <= 1
 
     - name: Verify node-exporter is running
-      command: docker ps --filter name=node-exporter --format "{{.Names}}"
+      command: docker ps --filter name=node-exporter
       register: node_exporter_status
-      failed_when: "'node-exporter' not in node_exporter_status.stdout"
+      failed_when: node_exporter_status.stdout_lines | length <= 1
 
     - name: Get deployment info
       shell: |
         echo "=== CI/CD Server Deployment Status ==="
+        echo ""
+        echo "[Jenkins]"
         docker ps --filter name=jenkins
+        echo ""
+        echo "[SonarQube]"
         docker ps --filter name=sonarqube
+        echo ""
+        echo "[Node Exporter]"
         docker ps --filter name=node-exporter
         echo ""
         echo "Jenkins URL: http://{{ inventory_hostname }}:8080"
