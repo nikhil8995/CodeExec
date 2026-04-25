@@ -1,0 +1,266 @@
+---
+- name: Provision or reuse App EC2
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    region: ap-south-1
+    instance_type: t3.micro
+    ami_id: ami-03f4878755434977f
+    key_name: codeexec-key
+    security_group_name: codeexec-app-sg
+
+  tasks:
+    - name: Check for existing App EC2
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "codeexec-app"
+          instance-state-name: ["running"]
+      register: ec2_info
+
+    - name: Create security group for App Server
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: CodeExec App Server SG
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [4000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5173]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5432]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9100]
+            cidr_ip: 10.0.0.0/16
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+    - name: Launch App EC2 if not exists
+      amazon.aws.ec2_instance:
+        name: codeexec-app
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_groups: ["{{ security_group_name }}"]
+        network:
+          assign_public_ip: true
+        wait: true
+        state: running
+        tags:
+          Name: codeexec-app
+      when: ec2_info.instances | length == 0
+      register: ec2_new
+
+    - name: Set App EC2 IP
+      set_fact:
+        app_ec2_ip: >-
+          {{
+            (ec2_info.instances[0].public_ip_address
+            if ec2_info.instances | length > 0
+            else ec2_new.instances[0].public_ip_address)
+          }}
+
+    - name: Add App instance to inventory
+      add_host:
+        name: "{{ app_ec2_ip }}"
+        groups: app_server
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "{{ lookup('env', 'SSH_KEY_PATH') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Wait for SSH
+      wait_for:
+        host: "{{ app_ec2_ip }}"
+        port: 22
+        delay: 15
+        timeout: 180
+
+- name: Setup App Server and deploy CodeExec
+  hosts: app_server
+  become: true
+
+  vars:
+    image_tag: "{{ github_ref | default('latest') }}"
+    jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
+    postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+    postgres_user: "{{ lookup('env', 'POSTGRES_USER') | default('postgres') }}"
+    db_name: "{{ lookup('env', 'POSTGRES_DB') | default('codeexec') }}"
+
+  tasks:
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install Docker & Git
+      apt:
+        name:
+          - docker.io
+          - git
+          - docker-compose
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ubuntu to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
+
+    - name: Remove old containers
+      shell: |
+        docker rm -f codeexec-frontend codeexec-backend codeexec-postgres node-exporter || true
+
+    - name: Ensure network exists
+      shell: |
+        docker network inspect codeexec-network >/dev/null 2>&1 || \
+        docker network create codeexec-network
+
+    - name: Ensure volume exists
+      shell: |
+        docker volume inspect postgres_data >/dev/null 2>&1 || \
+        docker volume create postgres_data
+
+    - name: Remove old project
+      file:
+        path: /home/ubuntu/CodeExec
+        state: absent
+
+    - name: Clone project
+      git:
+        repo: "{{ lookup('env', 'GITHUB_REPO') | default('https://github.com/nikhil8995/CodeExec.git') }}"
+        dest: /home/ubuntu/CodeExec
+        version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
+
+    - name: Run PostgreSQL
+      command: >
+        docker run -d --name codeexec-postgres
+        --network codeexec-network
+        -e POSTGRES_USER={{ postgres_user }}
+        -e POSTGRES_PASSWORD={{ postgres_password }}
+        -e POSTGRES_DB={{ db_name }}
+        -v postgres_data:/var/lib/postgresql/data
+        -p 5432:5432
+        --restart unless-stopped
+        postgres:15
+
+    - name: Wait for Postgres
+      shell: |
+        until docker exec codeexec-postgres pg_isready -U {{ postgres_user }}; do
+          sleep 2
+        done
+      register: pg_ready
+      retries: 30
+      delay: 2
+
+    - name: Build backend with tag
+      command: docker build -t codeexec-backend:{{ image_tag }} /home/ubuntu/CodeExec/backend
+
+    - name: Tag backend as latest
+      command: docker tag codeexec-backend:{{ image_tag }} codeexec-backend:latest
+
+    - name: Run backend
+      command: >
+        docker run -d --name codeexec-backend
+        --network codeexec-network
+        -p 4000:4000
+        -e DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@codeexec-postgres:5432/{{ db_name }}
+        -e JWT_SECRET={{ jwt_secret }}
+        --restart unless-stopped
+        codeexec-backend:latest
+
+    - name: Wait for backend health
+      uri:
+        url: "http://localhost:4000/api/health"
+        method: GET
+        status_code: 200
+      register: backend_health
+      retries: 30
+      delay: 2
+      until: backend_health.status == 200
+
+    - name: Run migrations
+      command: docker exec codeexec-backend npx prisma migrate deploy
+      register: migration_result
+      failed_when: false
+
+    - name: Build frontend with tag
+      command: >
+        docker build
+        --build-arg VITE_API_URL=http://{{ inventory_hostname }}:4000/api
+        -t codeexec-frontend:{{ image_tag }}
+        /home/ubuntu/CodeExec/frontend
+
+    - name: Tag frontend as latest
+      command: docker tag codeexec-frontend:{{ image_tag }} codeexec-frontend:latest
+
+    - name: Run frontend
+      command: >
+        docker run -d --name codeexec-frontend
+        --network codeexec-network
+        -p 5173:5173
+        --restart unless-stopped
+        codeexec-frontend:latest
+
+    - name: Wait for frontend health
+      wait_for:
+        port: 5173
+        delay: 5
+        timeout: 60
+
+    - name: Run Node Exporter
+      command: >
+        docker run -d --name node-exporter
+        --network codeexec-network
+        -p 9100:9100
+        --restart unless-stopped
+        prom/node-exporter:latest
+      ignore_errors: true
+
+- name: Post-deployment verification for App Server
+  hosts: app_server
+  become: true
+
+  tasks:
+    - name: Verify backend is running
+      command: docker ps --filter "name=codeexec-backend" --format "{{.Names}}"
+      register: backend_status
+      failed_when: "'codeexec-backend' not in backend_status.stdout"
+
+    - name: Verify frontend is running
+      command: docker ps --filter "name=codeexec-frontend" --format "{{.Names}}"
+      register: frontend_status
+      failed_when: "'codeexec-frontend' not in frontend_status.stdout"
+
+    - name: Verify postgres is running
+      command: docker ps --filter "name=codeexec-postgres" --format "{{.Names}}"
+      register: postgres_status
+      failed_when: "'codeexec-postgres' not in postgres_status.stdout"
+
+    - name: Verify node-exporter is running
+      command: docker ps --filter "name=node-exporter" --format "{{.Names}}"
+      register: node_exporter_status
+      failed_when: "'node-exporter' not in node_exporter_status.stdout"
+
+    - name: Get deployment info
+      shell: |
+        echo "Backend: $(docker ps --filter 'name=codeexec-backend' --format '{{.Status}}')"
+        echo "Frontend: $(docker ps --filter 'name=codeexec-frontend' --format '{{.Status}}')"
+        echo "Postgres: $(docker ps --filter 'name=codeexec-postgres' --format '{{.Status}}')"
+        echo "Node Exporter: $(docker ps --filter 'name=node-exporter' --format '{{.Status}}')"

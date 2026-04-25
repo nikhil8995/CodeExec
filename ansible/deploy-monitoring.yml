@@ -1,0 +1,215 @@
+---
+- name: Provision or reuse Monitoring EC2
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    region: ap-south-1
+    instance_type: t3.micro
+    ami_id: ami-03f4878755434977f
+    key_name: codeexec-key
+    security_group_name: codeexec-monitoring-sg
+
+  tasks:
+    - name: Check for existing Monitoring EC2
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "codeexec-monitoring"
+          instance-state-name: ["running"]
+      register: ec2_info
+
+    - name: Create security group for Monitoring Server
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: CodeExec Monitoring Server SG
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9090]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [3000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9093]
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+    - name: Launch Monitoring EC2 if not exists
+      amazon.aws.ec2_instance:
+        name: codeexec-monitoring
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_groups: ["{{ security_group_name }}"]
+        network:
+          assign_public_ip: true
+        wait: true
+        state: running
+        tags:
+          Name: codeexec-monitoring
+      when: ec2_info.instances | length == 0
+      register: ec2_new
+
+    - name: Set Monitoring EC2 IP
+      set_fact:
+        mon_ec2_ip: >-
+          {{
+            (ec2_info.instances[0].public_ip_address
+            if ec2_info.instances | length > 0
+            else ec2_new.instances[0].public_ip_address)
+          }}
+
+    - name: Add Monitoring instance to inventory
+      add_host:
+        name: "{{ mon_ec2_ip }}"
+        groups: monitoring_server
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "{{ lookup('env', 'SSH_KEY_PATH') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Wait for SSH
+      wait_for:
+        host: "{{ mon_ec2_ip }}"
+        port: 22
+        delay: 15
+        timeout: 180
+
+    - name: Store Monitoring EC2 IP for Prometheus config
+      set_fact:
+        monitoring_ec2_ip: "{{ mon_ec2_ip }}"
+
+- name: Setup Monitoring Server
+  hosts: monitoring_server
+  become: true
+
+  vars:
+    app_server_ip: "{{ hostvars[groups['app_server'][0]]['app_ec2_ip'] if groups['app_server'] | length > 0 else '3.109.48.78' }}"
+
+  tasks:
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install Docker & Git
+      apt:
+        name:
+          - docker.io
+          - git
+          - docker-compose
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ubuntu to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
+
+    - name: Remove old containers
+      shell: |
+        docker rm -f prometheus grafana alertmanager || true
+
+    - name: Ensure network exists
+      shell: |
+        docker network inspect monitoring-network >/dev/null 2>&1 || \
+        docker network create monitoring-network
+
+    - name: Remove old project
+      file:
+        path: /home/ubuntu/CodeExec
+        state: absent
+
+    - name: Clone project
+      git:
+        repo: "{{ lookup('env', 'GITHUB_REPO') | default('https://github.com/nikhil8995/CodeExec.git') }}"
+        dest: /home/ubuntu/CodeExec
+        version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
+
+    - name: Create prometheus config with external scrape targets
+      template:
+        src: /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml
+        dest: /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml
+      vars:
+        node_exporter_ip: "{{ app_server_ip }}"
+
+    - name: Run Prometheus
+      command: >
+        docker run -d --name prometheus
+        --network monitoring-network
+        -p 9090:9090
+        -v /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        -v /home/ubuntu/CodeExec/monitoring/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml
+        -v /home/ubuntu/CodeExec/monitoring/prometheus/recording_rules.yml:/etc/prometheus/recording_rule.yml
+        --restart unless-stopped
+        prom/prometheus:latest
+      ignore_errors: true
+
+    - name: Wait for Prometheus
+      wait_for:
+        port: 9090
+        delay: 5
+        timeout: 60
+
+    - name: Run Grafana
+      command: >
+        docker run -d --name grafana
+        --network monitoring-network
+        -p 3000:3000
+        -v grafana-data:/var/lib/grafana
+        -v /home/ubuntu/CodeExec/monitoring/grafana/provisioning:/etc/grafana/provisioning
+        -e GF_SERVER_ROOT_URL=http://{{ inventory_hostname }}:3000
+        -e GF_SECURITY_ADMIN_PASSWORD=admin
+        --restart unless-stopped
+        grafana/grafana:latest
+      ignore_errors: true
+
+    - name: Run Alertmanager
+      command: >
+        docker run -d --name alertmanager
+        --network monitoring-network
+        -p 9093:9093
+        -v /home/ubuntu/CodeExec/monitoring/alertmanager/config.yml:/etc/alertmanager/alertmanager.yml
+        --restart unless-stopped
+        prom/alertmanager:latest
+      ignore_errors: true
+
+- name: Post-deployment verification for Monitoring Server
+  hosts: monitoring_server
+  become: true
+
+  tasks:
+    - name: Verify prometheus is running
+      command: docker ps --filter "name=prometheus" --format "{{.Names}}"
+      register: prometheus_status
+      failed_when: "'prometheus' not in prometheus_status.stdout"
+
+    - name: Verify grafana is running
+      command: docker ps --filter "name=grafana" --format "{{.Names}}"
+      register: grafana_status
+      failed_when: "'grafana' not in grafana_status.stdout"
+
+    - name: Verify alertmanager is running
+      command: docker ps --filter "name=alertmanager" --format "{{.Names}}"
+      register: alertmanager_status
+      failed_when: "'alertmanager' not in alertmanager_status.stdout"
+
+    - name: Get deployment info
+      shell: |
+        echo "Prometheus: $(docker ps --filter 'name=prometheus' --format '{{.Status}}')"
+        echo "Grafana: $(docker ps --filter 'name=grafana' --format '{{.Status}}')"
+        echo "Alertmanager: $(docker ps --filter 'name=alertmanager' --format '{{.Status}}')"
