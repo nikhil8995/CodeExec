@@ -1,48 +1,32 @@
 ---
-- name: Deploy CodeExec to 3-EC2 Architecture
+- name: Deploy CI/CD Server
+  import_playbook: deploy-cicd.yml
+
+- name: Deploy App Server
+  import_playbook: deploy-app.yml
+
+- name: Deploy Monitoring Server
+  import_playbook: deploy-monitoring.yml
+
+- name: Display deployment summary
   hosts: localhost
-  connection: local
   gather_facts: false
 
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-    region: ap-south-1
-
   tasks:
-    - name: Deploy CI/CD Server
-      ansible.builtin.import_playbook: deploy-cicd.yml
-
-    - name: Deploy App Server
-      ansible.builtin.import_playbook: deploy-app.yml
-
-    - name: Get EC2 IPs
+    - name: Get all EC2 instances
       amazon.aws.ec2_instance_info:
-        region: "{{ region }}"
+        region: ap-south-1
         filters:
           instance-state-name: ["running"]
       register: all_ec2_info
 
-    - name: Deploy Monitoring Server
-      ansible.builtin.import_playbook: deploy-monitoring.yml
-
-    - name: Display deployment summary
+    - name: Show deployment summary
       debug:
         msg: |
           ================================================
           CodeExec 3-EC2 Deployment Complete!
           ================================================
-          EC2 #1 - CI/CD Server:
-            - Jenkins: http://<cicd-ip>:8080
-            - SonarQube: http://<cicd-ip>:9000
-            - Node Exporter: http://<cicd-ip>:9100
-
-          EC2 #2 - App Server:
-            - PostgreSQL: <app-ip>:5432
-            - Backend: <app-ip>:4000
-            - Frontend: <app-ip>:5173
-
-          EC2 #3 - Monitoring Server:
-            - Prometheus: <monitoring-ip>:9090
-            - Grafana: <monitoring-ip>:3000
-            - Alertmanager: <monitoring-ip>:9093
+          EC2 #1 - CI/CD Server: <IP>
+          EC2 #2 - App Server: <IP>
+          EC2 #3 - Monitoring Server: <IP>
           ================================================
