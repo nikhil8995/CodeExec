@@ -1,10 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:18'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     environment {
         SONAR_TOKEN = credentials('sonar-token')
@@ -135,13 +130,7 @@ pipeline {
 
     post {
         failure {
-            script {
-                sh '''
-                curl -X POST "$SLACK_WEBHOOK" \
-                  -H 'Content-type: application/json' \
-                  --data '{"text": "CodeExec Pipeline Failed: '"${BUILD_URL}"'"}'
-                '''
-            }
+             echo "Pipeline failed"
         }
 
         success {
