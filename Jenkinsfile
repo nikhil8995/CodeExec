@@ -109,13 +109,8 @@ EOF
         }
 
         success {
-            script {
-                sh '''
-                curl -X POST "$SLACK_WEBHOOK" \
-                  -H 'Content-type: application/json' \
-                  --data '{"text": "CodeExec Pipeline Succeeded: '"${BUILD_URL}"'"}'
-                '''
-            }
+            echo "Pipeline succeeded"
+
         }
 
         always {
