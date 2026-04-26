@@ -54,26 +54,28 @@ pipeline {
                     cd /home/ubuntu/CodeExec
 
                     git fetch origin
+                    git checkout jovan-aws-2ec2 || git checkout main
                     git pull origin jovan-aws-2ec2 || git pull origin main
 
-                    cd backend
-                    docker build -t codeexec-backend:latest .
+cd backend
+                    docker build --no-cache -t codeexec-backend:latest .
                     docker rm -f codeexec-backend || true
-                    docker run -d --name codeexec-backend \\
-                        --network codeexec-network \\
-                        -p 4000:4000 \\
-                        -e DATABASE_URL=postgresql://postgres:strongpassword123@codeexec-postgres:5432/codeexec \\
-                        -e JWT_SECRET=supersecretjwtkey123 \\
-                        --restart unless-stopped \\
+                    docker run -d --name codeexec-backend \
+                        --network codeexec-network \
+                        -p 4000:4000 \
+                        -e DATABASE_URL=postgresql://postgres:strongpassword123@codeexec-postgres:5432/codeexec \
+                        -e JWT_SECRET=supersecretjwtkey123 \
+                        --restart unless-stopped \
                         codeexec-backend:latest
 
-                    cd ../frontend
-                    docker build --build-arg VITE_API_URL=http://13.233.31.132/api -t codeexec-frontend:latest .
+cd ../frontend
+                    docker build --no-cache --build-arg VITE_API_URL=http://13.233.31.132/api -t codeexec-frontend:latest .
                     docker rm -f codeexec-frontend || true
-                    docker run -d --name codeexec-frontend \\
-                        --network codeexec-network \\
-                        -p 5173:5173 \\
-                        --restart unless-stopped \\
+                    docker run -d --name codeexec-frontend \
+                        --network codeexec-network \
+                        -p 5173:5173 \
+                        -e VITE_API_URL=http://13.233.31.132/api \
+                        --restart unless-stopped \
                         codeexec-frontend:latest
 
                     echo "Deployment complete!"
