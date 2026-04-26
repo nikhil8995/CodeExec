@@ -240,6 +240,15 @@
         delay: 5
         timeout: 60
 
+    - name: Run Node Exporter
+      command: >
+        docker run -d --name node-exporter
+        --network codeexec-network
+        -p 9100:9100
+        --restart unless-stopped
+        prom/node-exporter:latest
+      ignore_errors: true
+
 - name: Post-deployment verification for App Server
   hosts: app_server
   become: true
