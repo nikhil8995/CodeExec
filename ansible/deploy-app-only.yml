@@ -1,0 +1,71 @@
+---
+# Deploy only to App EC2 - rebuilds containers with latest code
+# Use this instead of full deploy.yml when you only need to update the app
+
+- name: Deploy to App EC2 only
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    region: ap-south-1
+    app_ec2_ip: 13.233.31.132
+
+  tasks:
+    - name: Get App EC2 info
+      amazon.aws.ec2_instance_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "codeexec-app"
+          instance-state-name: ["running"]
+      register: app_ec2_info
+
+    - name: Set App EC2 IP
+      set_fact:
+        target_app_ip: "{{ app_ec2_info.instances[0].public_ip_address if app_ec2_info.instances | length > 0 else app_ec2_ip }}"
+
+- name: Deploy to App EC2 via SSH
+  hosts: "{{ target_app_ip }}"
+  become: true
+
+  tasks:
+    - name: Pull latest code
+      shell: |
+        cd /home/ubuntu/CodeExec
+        git fetch origin
+        git pull origin jovan-aws-2ec2 || git pull origin main
+      register: git_pull
+      failed_when: false
+
+    - name: Rebuild backend container
+      shell: |
+        cd /home/ubuntu/CodeExec/backend
+        docker build -t codeexec-backend:latest .
+        docker rm -f codeexec-backend || true
+        docker run -d --name codeexec-backend \
+          --network codeexec-network \
+          -p 4000:4000 \
+          -e DATABASE_URL=postgresql://postgres:strongpassword123@codeexec-postgres:5432/codeexec \
+          -e JWT_SECRET=supersecretjwtkey123 \
+          --restart unless-stopped \
+          codeexec-backend:latest
+      register: backend_build
+
+    - name: Rebuild frontend container
+      shell: |
+        cd /home/ubuntu/CodeExec/frontend
+        docker build --build-arg VITE_API_URL=http://{{ inventory_hostname }}/api -t codeexec-frontend:latest .
+        docker rm -f codeexec-frontend || true
+        docker run -d --name codeexec-frontend \
+          --network codeexec-network \
+          -p 5173:5173 \
+          --restart unless-stopped \
+          codeexec-frontend:latest
+      register: frontend_build
+
+    - name: Verify containers running
+      shell: docker ps --filter "name=codeexec-"
+
+    - name: Restart backend if needed
+      shell: docker restart codeexec-backend || true

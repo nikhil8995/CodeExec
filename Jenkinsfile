@@ -22,6 +22,7 @@ pipeline {
             }
         }
 
+        // SonarQube stages commented out - uncomment if you have SonarQube plugin configured
         // stage('SonarQube Analysis') {
         //     steps {
         //         withSonarQubeEnv('SonarQube') {
@@ -37,21 +38,7 @@ pipeline {
         //     }
         // }
 
-        // stage('Quality Gate') {
-        //     steps {
-        //         timeout(time: 10, unit: 'MINUTES') {
-        //             waitForQualityGate abortPipeline: true
-        //         }
-        //     }
-        // }
-
-        // stage('Container Validation & E2E') {
-        //     when {
-        //         expression { return false }
-        //     }
-        // }
-
-        stage('Deploy to Staging') {
+        stage('Deploy to App EC2 Only') {
             steps {
                 withCredentials([
                     string(credentialsId: 'aws-access-key-staging', variable: 'AWS_ACCESS_KEY_ID'),
@@ -63,16 +50,45 @@ pipeline {
                     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                     export AWS_DEFAULT_REGION=ap-south-1
 
-                    ansible-playbook ansible/deploy.yml \
-                    -e "env_type=staging" \
-                    -e "github_ref=${GIT_COMMIT}" \
-                    --private-key $SSH_KEY
+                    # Deploy only to App EC2 (not all 3)
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY ubuntu@13.233.31.132 << 'EOF'
+                        cd /home/ubuntu/CodeExec
+                        
+                        # Pull latest code
+                        git fetch origin
+                        git pull origin jovan-aws-2ec2 || git pull origin main
+                        
+                        # Rebuild backend
+                        cd backend
+                        docker build -t codeexec-backend:latest .
+                        docker rm -f codeexec-backend || true
+                        docker run -d --name codeexec-backend \
+                            --network codeexec-network \
+                            -p 4000:4000 \
+                            -e DATABASE_URL=postgresql://postgres:strongpassword123@codeexec-postgres:5432/codeexec \
+                            -e JWT_SECRET=supersecretjwtkey123 \
+                            --restart unless-stopped \
+                            codeexec-backend:latest
+                        
+                        # Rebuild frontend
+                        cd ../frontend
+                        docker build --build-arg VITE_API_URL=http://13.233.31.132/api -t codeexec-frontend:latest .
+                        docker rm -f codeexec-frontend || true
+                        docker run -d --name codeexec-frontend \
+                            --network codeexec-network \
+                            -p 5173:5173 \
+                            --restart unless-stopped \
+                            codeexec-frontend:latest
+                        
+                        echo "Deployment complete!"
+                        docker ps
+                    EOF
                     '''
                 }
             }
         }
 
-        stage('Staging Health Check') {
+        stage('App Health Check') {
             steps {
                 timeout(time: 120, unit: 'SECONDS') {
                     waitUntil {
@@ -85,35 +101,10 @@ pipeline {
                         }
                     }
                 }
+                echo 'App health check passed!'
             }
         }
 
-        stage('Production Approval') {
-            steps {
-                input message: "Promote Staging to Production?", ok: "Deploy!"
-            }
-        }
-
-        stage('Deploy to Production') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'aws-access-key-production', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-key-production', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')
-                ]) {
-                    sh '''
-                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                    export AWS_DEFAULT_REGION=ap-south-1
-
-                    ansible-playbook ansible/deploy.yml \
-                    -e "env_type=production" \
-                    -e "github_ref=${GIT_COMMIT}" \
-                    --private-key $SSH_KEY
-                    '''
-                }
-            }
-        }
     }
 
     post {
@@ -132,7 +123,7 @@ pipeline {
         }
 
         always {
-            echo 'Cleaning up...'
+            echo 'Cleanup complete'
         }
     }
 }
