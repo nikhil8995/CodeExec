@@ -78,7 +78,7 @@ pipeline {
 
                     echo "Deployment complete!"
                     docker ps
-                    EOF
+EOF
                     """
                 }
             }
