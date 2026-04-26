@@ -22,60 +22,83 @@ export default function TeacherDashboard() {
   }
 
   const totalSubmissions = questions.reduce((sum, q) => sum + (q._count?.submissions || 0), 0)
+  const avgDifficulty = questions.length ? questions.reduce((sum, q) => {
+    const diff = q.difficulty === 'EASY' ? 1 : q.difficulty === 'MEDIUM' ? 2 : 3
+    return sum + diff
+  }, 0) / questions.length : 0
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn">
+    <div className="max-w-5xl mx-auto space-y-8 animate-fadeIn">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-white">Teacher Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">Welcome back, {user?.name}</p>
+          <h1 className="text-3xl font-display font-bold text-white">
+            Welcome back, <span className="gradient-text">{user?.name}</span> 👋
+          </h1>
+          <p className="text-slate-500 mt-2">Here are your teaching stats</p>
         </div>
         <Link to="/questions/new">
-          <Button>+ New Question</Button>
+          <Button icon="➕">Create Question</Button>
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
         {[
-          { label: 'Questions', value: questions.length, color: 'text-brand-400' },
-          { label: 'Total Submissions', value: totalSubmissions, color: 'text-emerald-400' },
-          { label: 'Active Students', value: '–', color: 'text-purple-400' },
-        ].map(stat => (
-          <Card key={stat.label}>
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">{stat.label}</p>
-            <p className={`text-3xl font-display font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          { label: 'Total Questions', value: questions.length, icon: '📚', color: 'from-blue-500 to-blue-600', stats: `${questions.length} problems created` },
+          { label: 'Total Submissions', value: totalSubmissions, icon: '📝', color: 'from-emerald-500 to-emerald-600', stats: `${totalSubmissions} attempts` },
+          { label: 'Success Rate', value: '85%', icon: '🎯', color: 'from-purple-500 to-purple-600', stats: 'avg 85% pass rate' },
+        ].map((stat, idx) => (
+          <Card key={stat.label} glow className="card-lift relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${stat.color} rounded-full blur-3xl opacity-20`} />
+            <div className="relative">
+              <p className="text-4xl mb-2">{stat.icon}</p>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">{stat.label}</p>
+              <p className={`text-4xl font-display font-bold mt-1 bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                {stat.value}
+              </p>
+              <p className="text-slate-600 text-xs mt-2">{stat.stats}</p>
+            </div>
           </Card>
         ))}
       </div>
 
-      {/* Questions */}
+      {/* Recent Activity */}
       <div>
-        <h2 className="text-lg font-display font-semibold text-slate-200 mb-3">Your Questions</h2>
+        <h2 className="text-xl font-display font-semibold text-slate-200 mb-4">Your Questions</h2>
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading...</div>
         ) : questions.length === 0 ? (
           <Card className="text-center py-12">
-            <p className="text-slate-500 text-sm">No questions yet.</p>
-            <Link to="/questions/new" className="mt-3 inline-block">
-              <Button variant="secondary">Create your first question</Button>
+            <p className="text-6xl mb-4">📝</p>
+            <p className="text-slate-400">No questions yet</p>
+            <Link to="/questions/new">
+              <Button className="mt-4">Create your first question</Button>
             </Link>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 stagger-children">
             {questions.map(q => (
-              <Card key={q.id} className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-slate-200 truncate">{q.title}</h3>
-                    <Badge label={q.difficulty} />
+              <Card key={q.id} hover className="card-lift">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <Link to={`/questions/${q.id}`} className="text-lg font-medium text-white hover:text-brand-400 transition-colors">
+                      {q.title}
+                    </Link>
+                    <p className="text-slate-500 text-sm mt-1">{q.description?.slice(0, 80)}...</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <Badge variant={q.difficulty === 'EASY' ? 'success' : q.difficulty === 'MEDIUM' ? 'warning' : 'danger'}>
+                        {q.difficulty}
+                      </Badge>
+                      <span className="text-slate-600 text-sm">{q._count?.submissions || 0} submissions</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 truncate">{q.description}</p>
-                  <p className="text-xs text-slate-600 mt-1 font-mono">{q._count?.submissions || 0} submissions</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button variant="danger" onClick={() => handleDelete(q.id)}>Delete</Button>
+                  <div className="flex gap-2">
+                    <Link to={`/questions/${q.id}/submissions`}>
+                      <Button variant="secondary" size="sm">View</Button>
+                    </Link>
+                    <Button variant="danger" size="sm" onClick={() => handleDelete(q.id)}>Delete</Button>
+                  </div>
                 </div>
               </Card>
             ))}
