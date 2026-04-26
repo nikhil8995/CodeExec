@@ -49,14 +49,16 @@ pipeline {
             steps {
                 sh 'docker-compose up -d --build'
 
-                waitFor {
-                    condition 'curl'
-                    timeout 60
-                    plugin 'workflow-support'
-                    target {
-                        url = 'http://localhost:5432'
-                        userAgent = false
-                        statusCode = -1
+                // Wait for PostgreSQL to be ready
+                timeout(time: 60, unit: 'SECONDS') {
+                    waitUntil {
+                        script {
+                            def result = sh(
+                                script: "curl -s http://localhost:5432 || true",
+                                returnStatus: true
+                            )
+                            return result == 0 || result == 7
+                        }
                     }
                 }
             }
@@ -75,7 +77,6 @@ pipeline {
                 ]) {
                     sh '''
                     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                     export AWS_DEFAULT_REGION=ap-south-1
 
@@ -87,13 +88,16 @@ pipeline {
 
         stage('Staging Health Check') {
             steps {
-                waitFor {
-                    condition 'http'
-                    timeout 120
-                    plugin 'workflow-support'
-                    target {
-                        url = 'http://staging.codeexec.com/api/health'
-                        statusCode = 200
+                // Wait for staging to be healthy
+                timeout(time: 120, unit: 'SECONDS') {
+                    waitUntil {
+                        script {
+                            def status = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/api/health || echo '000'",
+                                returnStdout: true
+                            ).trim()
+                            return status == '200'
+                        }
                     }
                 }
                 echo 'Staging health check passed'
