@@ -55,7 +55,8 @@ pipeline {
             steps {
                 withCredentials([
                     string(credentialsId: 'aws-access-key-staging', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-key-staging', variable: 'AWS_SECRET_ACCESS_KEY')
+                    string(credentialsId: 'aws-secret-key-staging', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')
                 ]) {
                     sh '''
                     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -63,8 +64,9 @@ pipeline {
                     export AWS_DEFAULT_REGION=ap-south-1
 
                     ansible-playbook ansible/deploy.yml \
-                      -e "env_type=staging" \
-                      -e "github_ref=${GIT_COMMIT}"
+                    -e "env_type=staging" \
+                    -e "github_ref=${GIT_COMMIT}" \
+                    --private-key $SSH_KEY
                     '''
                 }
             }
@@ -96,7 +98,8 @@ pipeline {
             steps {
                 withCredentials([
                     string(credentialsId: 'aws-access-key-production', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-key-production', variable: 'AWS_SECRET_ACCESS_KEY')
+                    string(credentialsId: 'aws-secret-key-production', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')
                 ]) {
                     sh '''
                     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -104,8 +107,9 @@ pipeline {
                     export AWS_DEFAULT_REGION=ap-south-1
 
                     ansible-playbook ansible/deploy.yml \
-                      -e "env_type=production" \
-                      -e "github_ref=${GIT_COMMIT}"
+                    -e "env_type=production" \
+                    -e "github_ref=${GIT_COMMIT}" \
+                    --private-key $SSH_KEY
                     '''
                 }
             }
