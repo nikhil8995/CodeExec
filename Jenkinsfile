@@ -45,11 +45,11 @@ pipeline {
         //     }
         // }
 
-        stage('Container Validation & E2E') {
-            when {
-                expression { return false }
-            }
-        }
+        // stage('Container Validation & E2E') {
+        //     when {
+        //         expression { return false }
+        //     }
+        // }
 
         stage('Deploy to Staging') {
             steps {
