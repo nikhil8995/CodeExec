@@ -33,7 +33,7 @@ export default function AppShell({ children }) {
             CE
           </div>
           {sidebarOpen && (
-            <span className="font-display font-bold text-white text-lg leading-none">CodeExec</span>
+            <span className="font-display font-bold text-white text-lg leading-none">CodeExec-changes</span>
           )}
         </div>
 
@@ -52,11 +52,10 @@ export default function AppShell({ children }) {
             const active = location.pathname === item.path
             return (
               <Link key={item.path} to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  active
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${active
                     ? 'bg-brand-600/20 text-brand-300 border border-brand-600/30'
                     : 'text-slate-400 hover:bg-dark-600 hover:text-slate-200'
-                }`}>
+                  }`}>
                 <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
                 {sidebarOpen && <span>{item.label}</span>}
               </Link>
