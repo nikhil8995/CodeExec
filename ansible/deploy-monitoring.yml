@@ -10,7 +10,7 @@
     instance_type: t3.micro
     ami_id: ami-03f4878755434977f
     key_name: codeexec-key
-    security_group_name: codeexec-monitoring-sg
+    security_group_name: codeexec-shared-sg
 
   tasks:
     - name: Check for existing Monitoring EC2
@@ -21,17 +21,36 @@
           instance-state-name: ["running"]
       register: ec2_info
 
-    - name: Create security group for Monitoring Server
+    - name: Create shared security group for all EC2s
       amazon.aws.ec2_security_group:
         name: "{{ security_group_name }}"
-        description: CodeExec Monitoring Server SG
+        description: CodeExec Shared SG - All servers can communicate internally
         region: "{{ region }}"
+        purge_rules: false
         rules:
           - proto: tcp
             ports: [22]
             cidr_ip: 0.0.0.0/0
           - proto: tcp
+            ports: [4000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5173]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [5432]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [8080]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
             ports: [9090]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9100]
             cidr_ip: 0.0.0.0/0
           - proto: tcp
             ports: [3000]
@@ -93,7 +112,8 @@
   become: true
 
   vars:
-    app_server_ip: "{{ hostvars[groups['app_server'][0]]['app_ec2_ip'] if groups['app_server'] | length > 0 else '3.109.48.78' }}"
+    app_server_ip: "{{ hostvars[groups['app_server'][0]]['app_ec2_ip'] if groups['app_server'] is defined and groups['app_server'] | length > 0 else omit }}"
+    cicd_server_ip: "{{ hostvars[groups['cicd_server'][0]]['cicd_ec2_ip'] if groups['cicd_server'] is defined and groups['cicd_server'] | length > 0 else omit }}"
 
   tasks:
     - name: Update packages
@@ -139,6 +159,15 @@
         repo: "{{ lookup('env', 'GITHUB_REPO') | default('https://github.com/nikhil8995/CodeExec.git') }}"
         dest: /home/ubuntu/CodeExec
         version: "{{ lookup('env', 'GITHUB_BRANCH') | default('main') }}"
+
+    - name: Generate prometheus.yml with dynamic IPs
+      template:
+        src: prometheus.yml.j2
+        dest: /home/ubuntu/CodeExec/monitoring/prometheus/prometheus.yml
+        mode: '0644'
+      vars:
+        app_ip: "{{ app_server_ip | default(omit) }}"
+        cicd_ip: "{{ cicd_server_ip | default(omit) }}"
 
     - name: Run Prometheus
       command: >
