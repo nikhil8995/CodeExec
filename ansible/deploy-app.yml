@@ -216,10 +216,22 @@
       register: migration_result
       failed_when: false
 
+    - name: Get App EC2 public IP for frontend
+      amazon.aws.ec2_instance_info:
+        region: ap-south-1
+        filters:
+          "tag:Name": "codeexec-app"
+          instance-state-name: ["running"]
+      register: app_ec2_info
+
+    - name: Set frontend API URL
+      set_fact:
+        frontend_api_url: "http://{{ app_ec2_info.instances[0].public_ip_address }}:4000/api"
+
     - name: Build frontend with tag
       command: >
         docker build
-        --build-arg VITE_API_URL=http://{{ app_ec2_ip }}:4000/api
+        --build-arg VITE_API_URL={{ frontend_api_url }}
         -t codeexec-frontend:{{ image_tag }}
         /home/ubuntu/CodeExec/frontend
 
