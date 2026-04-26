@@ -219,7 +219,7 @@
     - name: Build frontend with tag
       command: >
         docker build
-        --build-arg VITE_API_URL=http://{{ inventory_hostname }}:4000/api
+        --build-arg VITE_API_URL=http://{{ app_ec2_ip }}:4000/api
         -t codeexec-frontend:{{ image_tag }}
         /home/ubuntu/CodeExec/frontend
 
