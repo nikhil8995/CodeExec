@@ -20,8 +20,6 @@ const metricsMiddleware = promBundle({
 });
 app.use(metricsMiddleware);
 
-app.use(metricsMiddleware);
-
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
