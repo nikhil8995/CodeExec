@@ -1,30 +1,12 @@
 ---
 - name: Deploy CI/CD Server
-  hosts: localhost
-  gather_facts: true
-  tasks:
-    - import_playbook: deploy-cicd.yml
-    - name: Store CI/CD IP globally
-      set_fact:
-        global_cicd_ip: "{{ hostvars[groups['cicd_server'][0]]['cicd_ec2_ip'] }}"
+  import_playbook: deploy-cicd.yml
 
 - name: Deploy App Server
-  hosts: localhost
-  gather_facts: true
-  tasks:
-    - import_playbook: deploy-app.yml
-    - name: Store App IP globally
-      set_fact:
-        global_app_ip: "{{ hostvars[groups['app_server'][0]]['app_ec2_ip'] }}"
+  import_playbook: deploy-app.yml
 
 - name: Deploy Monitoring Server
-  hosts: localhost
-  gather_facts: true
-  tasks:
-    - import_playbook: deploy-monitoring.yml
-    - name: Store Monitoring IP globally
-      set_fact:
-        global_monitoring_ip: "{{ hostvars[groups['monitoring_server'][0]]['mon_ec2_ip'] }}"
+  import_playbook: deploy-monitoring.yml
 
 - name: Display deployment summary
   hosts: localhost
@@ -43,7 +25,7 @@
         msg: |
           ================================================
           CodeExec 3-EC2 Deployment Complete!
-          EC2 #1 - CI/CD Server: {{ global_cicd_ip | default('N/A') }}
-          EC2 #2 - App Server: {{ global_app_ip | default('N/A') }}
-          EC2 #3 - Monitoring Server: {{ global_monitoring_ip | default('N/A') }}
+          EC2 #1 - CI/CD Server: <IP>
+          EC2 #2 - App Server: <IP>
+          EC2 #3 - Monitoring Server: <IP>
           ================================================
