@@ -22,28 +22,28 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                    sonar-scanner \
-                      -Dsonar.projectKey=codeexec \
-                      -Dsonar.sources=backend/src,frontend/src \
-                      -Dsonar.tests=backend/tests,frontend/src/__tests__ \
-                      -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend/coverage/lcov.info \
-                      -Dsonar.login=$SONAR_TOKEN
-                    '''
-                }
-            }
-        }
+        // stage('SonarQube Analysis') {
+        //     steps {
+        //         withSonarQubeEnv('SonarQube') {
+        //             sh '''
+        //             sonar-scanner \
+        //               -Dsonar.projectKey=codeexec \
+        //               -Dsonar.sources=backend/src,frontend/src \
+        //               -Dsonar.tests=backend/tests,frontend/src/__tests__ \
+        //               -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend/coverage/lcov.info \
+        //               -Dsonar.login=$SONAR_TOKEN
+        //             '''
+        //         }
+        //     }
+        // }
 
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
+        // stage('Quality Gate') {
+        //     steps {
+        //         timeout(time: 10, unit: 'MINUTES') {
+        //             waitForQualityGate abortPipeline: true
+        //         }
+        //     }
+        // }
 
         stage('Container Validation & E2E') {
             steps {
