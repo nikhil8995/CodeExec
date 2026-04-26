@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { exec } = require('child_process');
 
 const {
   executionDurationHistogram,
