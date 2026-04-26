@@ -45,7 +45,7 @@ describe('Login Page', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Register')).toBeInTheDocument()
+    expect(screen.getByText('Create one')).toBeInTheDocument()
   })
 
   it('should display error message on login failure', async () => {
