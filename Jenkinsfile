@@ -59,24 +59,21 @@ pipeline {
 
 cd backend
                     docker build --no-cache -t codeexec-backend:latest .
-                    docker rm -f codeexec-backend || true
-                    docker run -d --name codeexec-backend \
+                    docker rm -f codeexec-backend 2>/dev/null || true
+                    docker run -d \
+                        --name codeexec-backend \
                         --network codeexec-network \
                         -p 4000:4000 \
                         -e DATABASE_URL=postgresql://postgres:strongpassword123@codeexec-postgres:5432/codeexec \
                         -e JWT_SECRET=supersecretjwtkey123 \
+                        -e PORT=4000 \
                         --restart unless-stopped \
                         codeexec-backend:latest
 
 cd ../frontend
-                    docker build --no-cache --build-arg VITE_API_URL=http://13.233.31.132/api -t codeexec-frontend:latest .
+                    docker build --no-cache --build-arg VITE_API_URL=http://13.233.31.132:4000/api -t codeexec-frontend:latest .
                     docker rm -f codeexec-frontend || true
-                    docker run -d --name codeexec-frontend \
-                        --network codeexec-network \
-                        -p 5173:5173 \
-                        -e VITE_API_URL=http://13.233.31.132/api \
-                        --restart unless-stopped \
-                        codeexec-frontend:latest
+                    docker run -d --name codeexec-frontend --network codeexec-network -p 5173:5173 --restart unless-stopped codeexec-frontend:latest
 
                     echo "Deployment complete!"
                     docker ps
