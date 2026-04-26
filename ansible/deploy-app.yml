@@ -10,7 +10,7 @@
     instance_type: t3.micro
     ami_id: ami-03f4878755434977f
     key_name: codeexec-key
-    security_group_name: codeexec-app-sg
+    security_group_name: codeexec-shared-sg
 
   tasks:
     - name: Check for existing App EC2
@@ -21,11 +21,12 @@
           instance-state-name: ["running"]
       register: ec2_info
 
-    - name: Create security group for App Server
+    - name: Create shared security group for all EC2s
       amazon.aws.ec2_security_group:
         name: "{{ security_group_name }}"
-        description: CodeExec App Server SG
+        description: CodeExec Shared SG - All servers can communicate internally
         region: "{{ region }}"
+        purge_rules: false
         rules:
           - proto: tcp
             ports: [22]
@@ -40,8 +41,23 @@
             ports: [5432]
             cidr_ip: 0.0.0.0/0
           - proto: tcp
+            ports: [8080]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9090]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
             ports: [9100]
-            cidr_ip: 10.0.0.0/16
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [3000]
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: [9093]
+            cidr_ip: 0.0.0.0/0
         rules_egress:
           - proto: all
             cidr_ip: 0.0.0.0/0
