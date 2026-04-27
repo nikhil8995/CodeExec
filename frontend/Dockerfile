@@ -2,7 +2,7 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-ARG VITE_API_URL=http://13.206.143.89:4000/api
+ARG VITE_API_URL=http://13.233.247.230:4000/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 COPY package*.json ./
