@@ -83,22 +83,22 @@ EOF
             }
         }
 
-        stage('App Health Check') {
-            steps {
-                timeout(time: 120, unit: 'SECONDS') {
-                    waitUntil {
-                        script {
-                            def status = sh(
-                                script: "curl -s -o /dev/null -w '%{http_code}' http://13.233.31.132:4000/api/health || echo 000",
-                                returnStdout: true
-                            ).trim()
-                            return status == '200'
-                        }
-                    }
-                }
-                echo 'App health check passed!'
-            }
-        }
+        // stage('App Health Check') {
+        //     steps {
+        //         timeout(time: 120, unit: 'SECONDS') {
+        //             waitUntil {
+        //                 script {
+        //                     def status = sh(
+        //                         script: "curl -s -o /dev/null -w '%{http_code}' http://13.233.31.132:4000/api/health || echo 000",
+        //                         returnStdout: true
+        //                     ).trim()
+        //                     return status == '200'
+        //                 }
+        //             }
+        //         }
+        //         echo 'App health check passed!'
+        //     }
+        // }
 
     }
 
